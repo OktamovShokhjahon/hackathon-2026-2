@@ -5,6 +5,7 @@ import { requireAuth } from "../../middleware/auth";
 import { requireRole } from "../../middleware/rbac";
 import { HttpError } from "../../middleware/errorHandler";
 import { analyzeDocument, uploadDocument } from "./document.service";
+import { DocumentModel } from "./document.model";
 import { recordAuditEvent } from "../audit/audit.service";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
@@ -39,10 +40,28 @@ documentUploadRouter.post("/", upload.single("file"), async (req, res, next) => 
   }
 });
 
+documentUploadRouter.get("/", async (req, res, next) => {
+  try {
+    const documents = await DocumentModel.find({
+      tenantId: req.auth!.tenantId,
+      patientId: (req.params as { patientId: string }).patientId,
+    })
+      // The stored text can be long and is not what a list needs.
+      .select("-extractedText")
+      .sort({ createdAt: -1 })
+      .limit(50);
+    res.json(documents);
+  } catch (err) {
+    next(err);
+  }
+});
+
 export const documentAnalyzeRouter = Router();
 documentAnalyzeRouter.use(requireAuth, requireRole("DOCTOR", "ADMIN"));
 
-const analyzeSchema = z.object({ extractedText: z.string().min(1) });
+// Optional: the server parses PDFs and DOCX itself, and a doctor only pastes
+// text when the file has none (a scan or a photo).
+const analyzeSchema = z.object({ extractedText: z.string().min(1).optional() });
 
 documentAnalyzeRouter.post("/:documentId/analyze", async (req, res, next) => {
   try {
@@ -51,7 +70,19 @@ documentAnalyzeRouter.post("/:documentId/analyze", async (req, res, next) => {
       tenantId: req.auth!.tenantId,
       documentId: req.params.documentId,
       extractedText: input.extractedText,
+      createdBy: req.auth!.userId,
     });
+
+    await recordAuditEvent({
+      tenantId: req.auth!.tenantId,
+      actorId: req.auth!.userId,
+      actorRole: req.auth!.role,
+      action: "document.analyze",
+      targetType: "Document",
+      targetId: req.params.documentId,
+      afterSummary: { candidates: result.createdRecordIds.length, aiAvailable: result.aiAvailable },
+    });
+
     res.json(result);
   } catch (err) {
     next(err);

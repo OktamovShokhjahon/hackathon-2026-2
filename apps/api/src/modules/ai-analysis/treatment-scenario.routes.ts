@@ -7,6 +7,7 @@ import { createTreatmentScenario, reviewScenario } from "./treatment-analysis.se
 import { TreatmentScenario } from "./treatment-scenario.model";
 import { recordAuditEvent } from "../audit/audit.service";
 import { HttpError } from "../../middleware/errorHandler";
+import { assertEntitlement } from "../subscriptions/entitlements.service";
 
 export const treatmentScenarioRouter = Router({ mergeParams: true });
 
@@ -24,6 +25,7 @@ treatmentScenarioRouter.use(requireAuth, requireRole("DOCTOR", "ADMIN"), stripCl
 treatmentScenarioRouter.post("/", async (req, res, next) => {
   try {
     const input = createScenarioSchema.parse(req.body);
+    await assertEntitlement(req.auth!.tenantId, "aiAnalysis");
     const result = await createTreatmentScenario({
       tenantId: req.auth!.tenantId,
       patientId: (req.params as { patientId: string }).patientId,

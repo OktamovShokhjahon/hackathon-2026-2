@@ -22,6 +22,12 @@
   --electric: #2f5fe0;
   --ai: #6d4fd6;
 
+  /* Chrome: the deep navy base and its cyan accent (spec 15). Content
+     surfaces stay white — these are for rails, headers and marketing ground. */
+  --navy: #0b1c2e;
+  --navy-deep: #07131f;
+  --cyan: #35d0e0;
+
   /* Re-picked for white: the dark-theme amber was unreadable here. */
   --state-green: #0f8a5f;
   --state-amber: #b0760a;
@@ -69,6 +75,21 @@ body {
 }
 
 @layer components {
+  /* Navy rail: the product's identity, kept off the clinical surfaces. */
+  .navy-rail {
+    background:
+      radial-gradient(ellipse 120% 40% at 0% 0%, rgba(53, 208, 224, 0.12), transparent 60%),
+      linear-gradient(180deg, var(--navy) 0%, var(--navy-deep) 100%);
+    border-right: 1px solid rgba(255, 255, 255, 0.07);
+  }
+
+  /* Glass: decorative panels only, never a surface carrying clinical values. */
+  .glass {
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(14px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+  }
+
   /* Instrument surface: the default content plane. */
   .panel {
     @apply rounded-lg border bg-surface;

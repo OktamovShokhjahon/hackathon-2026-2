@@ -5,7 +5,7 @@ import { requireAuth } from "../../middleware/auth";
 import { requireRole } from "../../middleware/rbac";
 import { HttpError } from "../../middleware/errorHandler";
 import { billingProvider, handleBillingWebhook } from "./billing.service";
-import { Subscription } from "./subscription.model";
+import { getSubscriptionWithUsage } from "./entitlements.service";
 import { env } from "../../config/env";
 
 export const billingRouter = Router();
@@ -24,7 +24,7 @@ billingRouter.post("/checkout-session", requireAuth, requireRole("ADMIN"), async
 
 billingRouter.get("/subscription", requireAuth, requireRole("ADMIN"), async (req, res, next) => {
   try {
-    const subscription = await Subscription.findOne({ tenantId: req.auth!.tenantId });
+    const subscription = await getSubscriptionWithUsage(req.auth!.tenantId);
     res.json(subscription);
   } catch (err) {
     next(err);

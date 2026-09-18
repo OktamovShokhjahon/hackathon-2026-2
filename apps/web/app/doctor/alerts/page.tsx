@@ -18,6 +18,8 @@ interface Scenario {
   _id: string;
   overallRisk: RiskColor;
   patientId: string;
+  patientName?: string;
+  patientCode?: string;
   createdAt: string;
   status: string;
 }
@@ -77,7 +79,7 @@ export default function DoctorAlertsPage() {
               <Row
                 key={alert._id}
                 href={`/doctor/patients/${alert.patientId}`}
-                primary={`Patient ${String(alert.patientId).slice(-6)}`}
+                primary={alert.patientName ?? alert.patientCode ?? "Unnamed patient"}
                 secondary={`${new Date(alert.createdAt).toLocaleString()} · ${alert.status}`}
                 trailing={<RiskBadge color={alert.overallRisk} quiet />}
               />

@@ -7,6 +7,7 @@ import { archivePatient, createPatient, getPatientById, listPatients } from "./p
 import { createPatientSchema, updatePatientSchema } from "./patient.validation";
 import { PatientProfile } from "./patient.model";
 import { recordAuditEvent } from "../audit/audit.service";
+import { assertEntitlement } from "../subscriptions/entitlements.service";
 import { recordsRouter } from "../medical-records/medical-record.routes";
 import { diagnosisRouter } from "../diagnoses/diagnosis.routes";
 import { medicationRouter, allergyRouter } from "../medications/medication.routes";
@@ -34,6 +35,7 @@ patientRouter.get("/", requireRole("DOCTOR", "ADMIN"), async (req, res, next) =>
 patientRouter.post("/", requireRole("DOCTOR", "ADMIN"), async (req, res, next) => {
   try {
     const input = createPatientSchema.parse(req.body);
+    await assertEntitlement(req.auth!.tenantId, "patient");
     const { user, profile } = await createPatient({
       tenantId: req.auth!.tenantId,
       doctorId: req.auth!.userId,

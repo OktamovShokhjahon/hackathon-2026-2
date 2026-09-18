@@ -5,6 +5,7 @@ import { HttpError } from "../../middleware/errorHandler";
 import { Diagnosis } from "../diagnoses/diagnosis.model";
 import { Medication } from "../medications/medication.model";
 import { MedicalRecord } from "../medical-records/medical-record.model";
+import { Allergy } from "../medications/allergy.model";
 import { TreatmentScenario } from "./treatment-scenario.model";
 import { runClinicalRules, type PatientSnapshot } from "./rule-engine";
 import { callGroqStructured, NARRATIVE_SCHEMA } from "./groq.client";
@@ -12,6 +13,29 @@ import { AIJob } from "./ai-job.model";
 import { RULE_SET_VERSION } from "./rule-catalog";
 
 const PROMPT_VERSION = "treatment-scenario-narrative@1";
+
+/**
+ * With the model unreachable the analysis still stands: the rules produced it.
+ * This restates that rule output in sentences and nothing else — no judgement,
+ * no threshold, no wording of its own. The UI labels it as a rule summary so
+ * it is never mistaken for a model explanation.
+ */
+function ruleSummaryNarrative(result: { signals: { organ: string; explanation: string }[]; missingData: string[]; overallRisk: string }, horizonDays: number): string {
+  const organs = [...new Set(result.signals.map((signal) => signal.organ.replace(/_/g, " ")))];
+  const lines: string[] = [];
+  lines.push(
+    organs.length > 0
+      ? `Over ${horizonDays} days the rule catalog flags ${organs.join(", ")} for this combination (overall ${result.overallRisk}).`
+      : `Over ${horizonDays} days no rule in the catalog flagged this combination.`
+  );
+  for (const explanation of [...new Set(result.signals.map((signal) => signal.explanation))]) {
+    lines.push(explanation);
+  }
+  if (result.missingData.length > 0) {
+    lines.push(`The analysis is incomplete until these are recorded: ${result.missingData.join(", ")}.`);
+  }
+  return lines.join(" ");
+}
 
 export interface CreateTreatmentScenarioInput {
   tenantId: string;
@@ -32,21 +56,36 @@ export function horizonDaysBetween(from: Date, to: Date): number {
   return Math.max(1, Math.round((to.getTime() - from.getTime()) / DAY_MS));
 }
 
-async function buildPatientSnapshot(tenantId: string, patientId: string, diagnosisIds: string[], medicationIds: string[]): Promise<PatientSnapshot> {
-  const [diagnoses, medications, labRecords] = await Promise.all([
+async function buildPatientSnapshot(
+  tenantId: string,
+  patientId: string,
+  diagnosisIds: string[],
+  medicationIds: string[]
+): Promise<PatientSnapshot> {
+  const [diagnoses, medications, otherMedications, allergies, labRecords] = await Promise.all([
     Diagnosis.find({ tenantId, _id: { $in: diagnosisIds } }).lean(),
     Medication.find({ tenantId, _id: { $in: medicationIds } }).lean(),
+    // Everything else the patient is on: an interaction between the proposed
+    // drug and a drug already in the chart is exactly what this is for.
+    Medication.find({ tenantId, patientId, _id: { $nin: medicationIds }, status: "active" }).lean(),
+    Allergy.find({ tenantId, patientId }).lean(),
     MedicalRecord.find({ tenantId, patientId, type: "lab_result" }).sort({ eventDate: -1 }).limit(50).lean(),
   ]);
 
   const labValues: Record<string, number | undefined> = {};
+  const labUnits: Record<string, string | undefined> = {};
   const evidenceRecordIds: string[] = [];
   for (const record of labRecords) {
+    // An AI-extracted value a doctor has not approved is not a fact yet, so it
+    // never reaches the rules (spec 5: the verified snapshot only).
+    if (record.verificationStatus === "ai_unverified" || record.verificationStatus === "rejected") continue;
+
     const data = record.data as Record<string, unknown>;
     const fieldName = typeof data.field === "string" ? data.field : undefined;
     const value = typeof data.value === "number" ? data.value : undefined;
     if (fieldName && value !== undefined && labValues[fieldName] === undefined) {
       labValues[fieldName] = value;
+      labUnits[fieldName] = typeof data.unit === "string" ? data.unit : undefined;
       evidenceRecordIds.push(String(record._id));
     }
   }
@@ -54,7 +93,10 @@ async function buildPatientSnapshot(tenantId: string, patientId: string, diagnos
   return {
     diagnosisLabels: diagnoses.map((d) => d.label),
     medicationNames: medications.map((m) => m.genericName),
+    existingMedicationNames: otherMedications.map((m) => m.genericName),
+    allergySubstances: allergies.map((a) => a.substance),
     labValues,
+    labUnits,
     evidenceRecordIds,
   };
 }
@@ -132,6 +174,13 @@ export async function createTreatmentScenario(input: CreateTreatmentScenarioInpu
     modelId: env.groqModel,
     promptVersion: PROMPT_VERSION,
     ruleSetVersion: RULE_SET_VERSION,
+    // The explanation is stored with the analysis it explains: a doctor
+    // reopening the scenario later must see the same words, and must be able
+    // to tell a model-written paragraph from a rule result.
+    aiNarrative: aiResult.ok ? aiResult.data?.narrative : ruleSummaryNarrative(ruleResult, horizonDays),
+    narrativeSource: aiResult.ok ? "model" : "rule_summary",
+    aiAvailable: aiResult.ok,
+    aiError: aiResult.ok ? undefined : aiResult.error,
     status: "UNDER_REVIEW",
     recalculationRequired: false,
     createdBy: input.createdBy,
@@ -139,7 +188,8 @@ export async function createTreatmentScenario(input: CreateTreatmentScenarioInpu
 
   return {
     scenario,
-    aiNarrative: aiResult.ok ? aiResult.data?.narrative : null,
+    aiNarrative: aiResult.ok ? aiResult.data?.narrative : ruleSummaryNarrative(ruleResult, horizonDays),
+    narrativeSource: aiResult.ok ? "model" : "rule_summary",
     aiAvailable: aiResult.ok,
     aiError: aiResult.ok ? undefined : aiResult.error,
   };

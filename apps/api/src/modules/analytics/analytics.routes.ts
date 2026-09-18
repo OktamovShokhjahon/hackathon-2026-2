@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { Types } from "mongoose";
 import { requireAuth } from "../../middleware/auth";
 import { requireRole } from "../../middleware/rbac";
 import { TreatmentScenario } from "../ai-analysis/treatment-scenario.model";
@@ -12,9 +13,9 @@ analyticsRouter.get("/overview", async (req, res, next) => {
   try {
     const tenantId = req.auth!.tenantId;
     const [byRisk, byStatus, aiJobStats] = await Promise.all([
-      TreatmentScenario.aggregate([{ $match: { tenantId: req.auth!.tenantId } }, { $group: { _id: "$overallRisk", count: { $sum: 1 } } }]),
-      PatientProfile.aggregate([{ $match: { tenantId: req.auth!.tenantId } }, { $group: { _id: "$status", count: { $sum: 1 } } }]),
-      AIJob.aggregate([{ $match: { tenantId: req.auth!.tenantId } }, { $group: { _id: "$status", count: { $sum: 1 } } }]),
+      TreatmentScenario.aggregate([{ $match: { tenantId: new Types.ObjectId(req.auth!.tenantId) } }, { $group: { _id: "$overallRisk", count: { $sum: 1 } } }]),
+      PatientProfile.aggregate([{ $match: { tenantId: new Types.ObjectId(req.auth!.tenantId) } }, { $group: { _id: "$status", count: { $sum: 1 } } }]),
+      AIJob.aggregate([{ $match: { tenantId: new Types.ObjectId(req.auth!.tenantId) } }, { $group: { _id: "$status", count: { $sum: 1 } } }]),
     ]);
     res.json({ tenantId, byRisk, byStatus, aiJobStats });
   } catch (err) {
@@ -25,7 +26,7 @@ analyticsRouter.get("/overview", async (req, res, next) => {
 analyticsRouter.get("/trends", async (req, res, next) => {
   try {
     const trends = await TreatmentScenario.aggregate([
-      { $match: { tenantId: req.auth!.tenantId } },
+      { $match: { tenantId: new Types.ObjectId(req.auth!.tenantId) } },
       {
         $group: {
           _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },

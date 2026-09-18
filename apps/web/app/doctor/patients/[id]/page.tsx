@@ -12,6 +12,11 @@ import { twinSex } from "@/components/digital-twin/anatomy";
 import { DiagnosisDetail, type DiagnosisAiDetail } from "@/components/clinical/diagnosis-detail";
 import { DrugReferenceModal } from "@/components/clinical/drug-reference-modal";
 import { HistoryModal } from "@/components/clinical/history-modal";
+import { AllergyPanel } from "@/components/clinical/allergy-panel";
+import { DocumentIntake } from "@/components/clinical/document-intake";
+import { AnalysisFindings } from "@/components/clinical/analysis-findings";
+import { ScenarioReview } from "@/components/clinical/scenario-review";
+import { fieldList, humanizeEnum } from "@/lib/format";
 import { api, ApiError } from "@/lib/api-client";
 import type { OrganSignal } from "@/components/digital-twin/types";
 
@@ -50,6 +55,16 @@ interface Scenario {
   createdAt: string;
   modelId: string;
   ruleSetVersion: string;
+  aiNarrative?: string;
+  narrativeSource?: "model" | "rule_summary";
+  aiAvailable?: boolean;
+  aiError?: string;
+  doctorReview?: {
+    decision: "APPROVED" | "REJECTED" | "DISCONTINUED";
+    note?: string;
+    visibleToPatient: boolean;
+    reviewedAt: string;
+  };
 }
 
 function isoDaysFromNow(days: number): string {
@@ -170,7 +185,7 @@ export default function PatientDetailPage() {
     selectedDiagnosisIds.length > 0 && selectedMedicationIds.length > 0 && !runAnalysis.isPending;
 
   return (
-    <AppShell role="DOCTOR" navItems={NAV}>
+    <AppShell role="DOCTOR" navItems={NAV} crumbOverride={patient?.user.fullName}>
       <PageHeader
         eyebrow="Patient chart"
         title={patient?.user.fullName ?? "Patient"}
@@ -351,7 +366,10 @@ export default function PatientDetailPage() {
             />
           )}
         </Panel>
+        <AllergyPanel patientId={id} />
       </div>
+
+      <DocumentIntake patientId={id} />
 
       {/* ------------------------------------------------------- prediction */}
       <Panel title="Projection" className="mt-4">
@@ -423,15 +441,23 @@ export default function PatientDetailPage() {
             <span className="readout">Last projection</span>
             <p className="mt-1 text-[14px] text-ink">
               {new Date(latestScenario.createdAt).toLocaleString()} ·{" "}
-              {latestScenario.horizonDays}-day window
+              {latestScenario.horizonDays}-day window · {humanizeEnum(latestScenario.status)}
             </p>
+            {latestScenario.missingData.length > 0 && (
+              <p className="mt-1 font-mono text-[11px] text-state-amber">
+                Incomplete — {fieldList(latestScenario.missingData)} not on file
+              </p>
+            )}
           </div>
-          <button
-            onClick={() => setShowPrediction(true)}
-            className="rounded border border-[color:var(--line-strong)] px-4 py-2 text-sm text-ink transition hover:bg-ink/[0.04]"
-          >
-            See predictions
-          </button>
+          <div className="flex items-center gap-3">
+            <RiskBadge color={latestScenario.overallRisk} quiet />
+            <button
+              onClick={() => setShowPrediction(true)}
+              className="rounded border border-[color:var(--line-strong)] px-4 py-2 text-sm text-ink transition hover:bg-ink/[0.04]"
+            >
+              See predictions
+            </button>
+          </div>
         </div>
       )}
 
@@ -462,11 +488,20 @@ export default function PatientDetailPage() {
             </div>
           </div>
 
-          {latestScenario.missingData.length > 0 && (
-            <p className="mb-4 rounded border border-state-amber/40 bg-state-amber/10 px-3 py-2 text-xs text-state-amber">
-              Analysis incomplete — missing: {latestScenario.missingData.join(", ")}
-            </p>
-          )}
+          <div className="mb-5">
+            <AnalysisFindings
+              analysis={{
+                aiNarrative: latestScenario.aiNarrative,
+                narrativeSource: latestScenario.narrativeSource,
+                aiAvailable: latestScenario.aiAvailable,
+                aiError: latestScenario.aiError,
+                missingData: latestScenario.missingData,
+                signals: latestScenario.signals,
+                ruleSetVersion: latestScenario.ruleSetVersion,
+                modelId: latestScenario.modelId,
+              }}
+            />
+          </div>
 
           <DigitalTwinViewer
             beforeSignals={latestScenario.baselineSignals ?? []}
@@ -481,6 +516,8 @@ export default function PatientDetailPage() {
               stale: latestScenario.recalculationRequired,
             }}
           />
+
+          <ScenarioReview patientId={id} scenario={latestScenario} />
         </div>
       )}
 

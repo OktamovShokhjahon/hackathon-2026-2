@@ -34,6 +34,8 @@ interface DoctorDashboard {
     overallRisk: RiskColor;
     createdAt: string;
     patientId?: string;
+    patientName?: string;
+    patientCode?: string;
     status?: string;
   }>;
 }
@@ -175,9 +177,9 @@ export default function DoctorDashboardPage() {
                       key={analysis._id}
                       href={analysis.patientId ? `/doctor/patients/${analysis.patientId}` : undefined}
                       primary={
-                        analysis.patientId
-                          ? `Patient ${String(analysis.patientId).slice(-6)}`
-                          : `Analysis ${analysis._id.slice(-6)}`
+                        analysis.patientName ??
+                        analysis.patientCode ??
+                        "Unnamed patient"
                       }
                       secondary={`${new Date(analysis.createdAt).toLocaleString()}${
                         analysis.status ? ` · ${analysis.status}` : ""

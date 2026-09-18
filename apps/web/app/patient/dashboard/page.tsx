@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/ui/app-shell";
 import { RiskBadge } from "@/components/ui/risk-badge";
 import { EmptyState, MetaItem, PageHeader, Panel, Row, Skeleton } from "@/components/ui/console";
+import { LabTrend, type LabRecord } from "@/components/charts/lab-trend";
 import { api } from "@/lib/api-client";
 import type { RiskColor } from "@/components/digital-twin/types";
 
@@ -49,6 +50,10 @@ export default function PatientDashboardPage() {
   const scenarios = useQuery({
     queryKey: ["approved-scenarios"],
     queryFn: () => api.get<Scenario[]>("/me/approved-scenarios"),
+  });
+  const history = useQuery({
+    queryKey: ["me-history"],
+    queryFn: () => api.get<LabRecord[]>("/me/medical-history"),
   });
 
   const latest = scenarios.data?.[0];
@@ -162,6 +167,12 @@ export default function PatientDashboardPage() {
               body="Medications your doctor prescribes will appear here with their instructions."
             />
           )}
+        </Panel>
+      </div>
+
+      <div className="mt-4">
+        <Panel title="Your measurements over time">
+          {history.isLoading ? <Skeleton rows={3} /> : <LabTrend records={history.data ?? []} />}
         </Panel>
       </div>
 

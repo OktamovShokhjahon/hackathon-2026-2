@@ -4,6 +4,7 @@ import { requireRole } from "../../middleware/rbac";
 import { PatientProfile } from "./patient.model";
 import { TreatmentScenario } from "../ai-analysis/treatment-scenario.model";
 import { MedicalRecord } from "../medical-records/medical-record.model";
+import { attachPatientIdentity } from "./patient-identity";
 
 export const doctorRouter = Router();
 doctorRouter.use(requireAuth, requireRole("DOCTOR"));
@@ -21,7 +22,13 @@ doctorRouter.get("/dashboard", async (req, res, next) => {
       TreatmentScenario.find({ tenantId }).sort({ createdAt: -1 }).limit(10).lean(),
     ]);
 
-    res.json({ assignedPatients, needsReview, newAlerts, missingDataTasks, recentAnalyses });
+    res.json({
+      assignedPatients,
+      needsReview,
+      newAlerts,
+      missingDataTasks,
+      recentAnalyses: await attachPatientIdentity(tenantId, recentAnalyses),
+    });
   } catch (err) {
     next(err);
   }

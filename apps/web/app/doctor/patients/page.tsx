@@ -8,6 +8,7 @@ import { AppShell } from "@/components/ui/app-shell";
 import { EmptyState, PageHeader, Panel, Skeleton } from "@/components/ui/console";
 import { Field, Modal, inputClass } from "@/components/ui/modal";
 import { api, ApiError } from "@/lib/api-client";
+import { humanizeEnum } from "@/lib/format";
 
 const NAV = [
   { href: "/doctor/dashboard", label: "Dashboard" },
@@ -24,14 +25,32 @@ interface PatientRow {
 
 const EMPTY = { fullName: "", email: "", phone: "", password: "" };
 
+const STATUSES = ["ALL", "ACTIVE", "INCOMPLETE", "NEEDS_REVIEW", "FOLLOW_UP", "ARCHIVED"] as const;
+
+const STATUS_COLOR: Record<string, string> = {
+  ACTIVE: "var(--state-green)",
+  NEEDS_REVIEW: "var(--state-amber)",
+  INCOMPLETE: "var(--state-amber)",
+  FOLLOW_UP: "var(--signal)",
+  ARCHIVED: "var(--ink-faint)",
+};
+
 export default function DoctorPatientsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
+  const [status, setStatus] = useState<(typeof STATUSES)[number]>("ALL");
   const { data, isLoading } = useQuery({
-    queryKey: ["doctor-patients", search],
-    queryFn: () =>
-      api.get<PatientRow[]>(`/patients${search ? `?search=${encodeURIComponent(search)}` : ""}`),
+    queryKey: ["doctor-patients", search, status],
+    queryFn: () => {
+      // Both filters are applied server-side so the panel count matches what a
+      // search would return on a clinic with more patients than one page.
+      const params = new URLSearchParams();
+      if (search) params.set("search", search);
+      if (status !== "ALL") params.set("status", status);
+      const query = params.toString();
+      return api.get<PatientRow[]>(`/patients${query ? `?${query}` : ""}`);
+    },
   });
 
   const [open, setOpen] = useState(false);
@@ -74,7 +93,7 @@ export default function DoctorPatientsPage() {
         }
       />
 
-      <div className="mb-4">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
         <input
           placeholder="Search by name, code or phone"
           value={search}
@@ -82,6 +101,22 @@ export default function DoctorPatientsPage() {
           aria-label="Search patients"
           className={`${inputClass} max-w-sm`}
         />
+        <div className="flex flex-wrap gap-1" role="group" aria-label="Filter by status">
+          {STATUSES.map((option) => (
+            <button
+              key={option}
+              onClick={() => setStatus(option)}
+              aria-pressed={status === option}
+              className={`rounded border px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.1em] transition ${
+                status === option
+                  ? "border-[color:var(--signal)] text-signal"
+                  : "border-[color:var(--line)] text-ink-faint hover:text-ink"
+              }`}
+            >
+              {option === "ALL" ? "All" : humanizeEnum(option)}
+            </button>
+          ))}
+        </div>
       </div>
 
       <Panel title={`Panel${data ? ` · ${data.length}` : ""}`}>
@@ -104,8 +139,11 @@ export default function DoctorPatientsPage() {
                       {patient.user?.phone ? ` · ${patient.user.phone}` : ""}
                     </p>
                   </div>
-                  <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.1em] text-ink-faint">
-                    {patient.status.replace(/_/g, " ").toLowerCase()}
+                  <span
+                    className="shrink-0 font-mono text-[10px] uppercase tracking-[0.1em]"
+                    style={{ color: STATUS_COLOR[patient.status] ?? "var(--ink-faint)" }}
+                  >
+                    {humanizeEnum(patient.status)}
                   </span>
                 </Link>
               </li>
@@ -113,11 +151,26 @@ export default function DoctorPatientsPage() {
           </ul>
         ) : (
           <EmptyState
-            title={search ? "No patients match that search" : "No patients yet"}
+            title={
+              search || status !== "ALL" ? "No patients match these filters" : "No patients yet"
+            }
             body={
-              search
-                ? "Try a different name, patient code or phone number."
+              search || status !== "ALL"
+                ? "Try a different name, patient code or phone number, or clear the status filter."
                 : "Create the first patient to start building a chart."
+            }
+            action={
+              search || status !== "ALL" ? (
+                <button
+                  onClick={() => {
+                    setSearch("");
+                    setStatus("ALL");
+                  }}
+                  className="mt-1 font-mono text-[11px] uppercase tracking-[0.12em] text-signal hover:underline"
+                >
+                  Clear filters
+                </button>
+              ) : undefined
             }
           />
         )}
