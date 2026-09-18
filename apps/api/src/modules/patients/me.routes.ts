@@ -1,0 +1,108 @@
+import { Router } from "express";
+import { z } from "zod";
+import { requireAuth } from "../../middleware/auth";
+import { requireRole } from "../../middleware/rbac";
+import { HttpError } from "../../middleware/errorHandler";
+import { PatientProfile } from "./patient.model";
+import { User } from "../users/user.model";
+import { MedicalRecord } from "../medical-records/medical-record.model";
+import { Diagnosis } from "../diagnoses/diagnosis.model";
+import { Medication } from "../medications/medication.model";
+import { TreatmentScenario } from "../ai-analysis/treatment-scenario.model";
+
+export const meRouter = Router();
+meRouter.use(requireAuth, requireRole("PATIENT"));
+
+async function getOwnProfile(userId: string, tenantId: string) {
+  const profile = await PatientProfile.findOne({ userId, tenantId });
+  if (!profile) throw new HttpError(404, "Patient profile not found");
+  return profile;
+}
+
+meRouter.get("/profile", async (req, res, next) => {
+  try {
+    const [profile, user] = await Promise.all([
+      getOwnProfile(req.auth!.userId, req.auth!.tenantId),
+      User.findById(req.auth!.userId).select("fullName email phone"),
+    ]);
+    res.json({ profile, user });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Patients only ever see verified records — anything AI-unverified or a
+// physician-internal note stays hidden until a doctor approves it.
+meRouter.get("/medical-history", async (req, res, next) => {
+  try {
+    const profile = await getOwnProfile(req.auth!.userId, req.auth!.tenantId);
+    const records = await MedicalRecord.find({
+      tenantId: req.auth!.tenantId,
+      patientId: profile._id,
+      verificationStatus: "verified",
+    }).sort({ eventDate: -1 });
+    res.json(records);
+  } catch (err) {
+    next(err);
+  }
+});
+
+meRouter.get("/diagnoses", async (req, res, next) => {
+  try {
+    const profile = await getOwnProfile(req.auth!.userId, req.auth!.tenantId);
+    const diagnoses = await Diagnosis.find({ tenantId: req.auth!.tenantId, patientId: profile._id });
+    res.json(diagnoses);
+  } catch (err) {
+    next(err);
+  }
+});
+
+meRouter.get("/medications", async (req, res, next) => {
+  try {
+    const profile = await getOwnProfile(req.auth!.userId, req.auth!.tenantId);
+    const medications = await Medication.find({ tenantId: req.auth!.tenantId, patientId: profile._id, status: "active" });
+    res.json(medications);
+  } catch (err) {
+    next(err);
+  }
+});
+
+meRouter.get("/approved-scenarios", async (req, res, next) => {
+  try {
+    const profile = await getOwnProfile(req.auth!.userId, req.auth!.tenantId);
+    const scenarios = await TreatmentScenario.find({
+      tenantId: req.auth!.tenantId,
+      patientId: profile._id,
+      status: "APPROVED",
+      "doctorReview.visibleToPatient": true,
+    }).sort({ createdAt: -1 });
+    res.json(scenarios);
+  } catch (err) {
+    next(err);
+  }
+});
+
+const followUpSchema = z.object({
+  note: z.string().min(1).max(2000),
+  symptomTags: z.array(z.string()).default([]),
+});
+
+meRouter.post("/follow-up-observations", async (req, res, next) => {
+  try {
+    const input = followUpSchema.parse(req.body);
+    const profile = await getOwnProfile(req.auth!.userId, req.auth!.tenantId);
+    const record = await MedicalRecord.create({
+      tenantId: req.auth!.tenantId,
+      patientId: profile._id,
+      type: "symptom",
+      eventDate: new Date(),
+      data: { note: input.note, symptomTags: input.symptomTags },
+      sourceType: "patient_report",
+      verificationStatus: "unverified",
+      createdBy: req.auth!.userId,
+    });
+    res.status(201).json(record);
+  } catch (err) {
+    next(err);
+  }
+});

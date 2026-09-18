@@ -1,0 +1,197 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* --------------------------------------------------------------------------
+   TwinRx design tokens — light clinical theme.
+   The palette follows the anatomical-atlas reference: pale blue-grey ground,
+   white bodies, ink-dark type, and clinical states that stay legible on white.
+   -------------------------------------------------------------------------- */
+:root {
+  color-scheme: light;
+
+  --paper: #eef3f9;
+  --paper-deep: #dde7f2;
+  --surface: #ffffff;
+  --sunken: #e3ebf4;
+
+  --line: rgba(20, 44, 68, 0.12);
+  --line-strong: rgba(20, 44, 68, 0.24);
+
+  --signal: #0e7f8f;
+  --electric: #2f5fe0;
+  --ai: #6d4fd6;
+
+  /* Re-picked for white: the dark-theme amber was unreadable here. */
+  --state-green: #0f8a5f;
+  --state-amber: #b0760a;
+  --state-red: #cf3b47;
+
+  --ink: #13202c;
+  --ink-muted: #4f6274;
+  --ink-faint: #7c8fa1;
+}
+
+body {
+  background-color: var(--paper);
+  background-image: radial-gradient(
+      ellipse 90% 60% at 50% -10%,
+      rgba(255, 255, 255, 0.9),
+      transparent 60%
+    ),
+    radial-gradient(ellipse 70% 50% at 100% 0%, rgba(47, 95, 224, 0.07), transparent 60%);
+  background-attachment: fixed;
+  color: var(--ink);
+  font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: rgba(14, 127, 143, 0.2);
+}
+
+/* Keyboard focus stays visible everywhere — clinical workflows are keyboard-heavy. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@layer components {
+  /* Instrument surface: the default content plane. */
+  .panel {
+    @apply rounded-lg border bg-surface;
+    border-color: var(--line);
+    box-shadow: 0 1px 2px rgba(20, 44, 68, 0.04), 0 8px 24px -12px rgba(20, 44, 68, 0.12);
+  }
+
+  .panel-sunken {
+    @apply rounded-lg border;
+    background: var(--sunken);
+    border-color: var(--line);
+  }
+
+  /* Monospace utility type: labels, units, versions, identifiers. */
+  .readout {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    @apply text-[11px] uppercase tracking-[0.14em] text-ink-faint;
+  }
+
+  .readout-value {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    @apply tabular-nums;
+  }
+
+  .display {
+    font-family: var(--font-display), ui-sans-serif, sans-serif;
+    letter-spacing: -0.035em;
+    @apply font-semibold;
+  }
+
+  /* Hairline rail used to separate instrument sections. */
+  .rail {
+    height: 1px;
+    background: linear-gradient(to right, var(--line-strong), var(--line) 40%, transparent);
+  }
+}
+
+/* State emphasis. Never the only signal — always paired with text + icon. */
+.pulse-amber {
+  animation: pulse-amber 2.4s ease-in-out infinite;
+}
+.pulse-red {
+  animation: pulse-red 1.8s ease-in-out infinite;
+}
+
+@keyframes pulse-amber {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(176, 118, 10, 0.35); }
+  60% { box-shadow: 0 0 0 7px rgba(176, 118, 10, 0); }
+}
+@keyframes pulse-red {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(207, 59, 71, 0.4); }
+  60% { box-shadow: 0 0 0 9px rgba(207, 59, 71, 0); }
+}
+
+@keyframes modal-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modal-rise {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+.rise {
+  animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Scroll-reveal: set by IntersectionObserver in `useReveal`. */
+.reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.reveal[data-shown="true"] {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Range input styled as an instrument slider for the before/after morph. */
+input[type="range"].morph {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  height: 24px;
+}
+input[type="range"].morph::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(to right, #c3d2e0, var(--signal));
+}
+input[type="range"].morph::-moz-range-track {
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(to right, #c3d2e0, var(--signal));
+}
+input[type="range"].morph::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  height: 18px;
+  width: 6px;
+  border-radius: 2px;
+  background: var(--signal);
+  margin-top: -7.5px;
+  box-shadow: 0 1px 4px rgba(14, 127, 143, 0.5);
+  cursor: ew-resize;
+}
+input[type="range"].morph::-moz-range-thumb {
+  height: 18px;
+  width: 6px;
+  border: 0;
+  border-radius: 2px;
+  background: var(--signal);
+  box-shadow: 0 1px 4px rgba(14, 127, 143, 0.5);
+  cursor: ew-resize;
+}

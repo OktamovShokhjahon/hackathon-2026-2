@@ -1,0 +1,43 @@
+const CONFIG = {
+  green: {
+    label: "No significant risk",
+    glyph: "✓",
+    classes: "border-state-green/40 bg-state-green/10 text-state-green",
+    pulse: "",
+  },
+  yellow: {
+    label: "Monitoring required",
+    glyph: "△",
+    classes: "border-state-amber/40 bg-state-amber/10 text-state-amber",
+    pulse: "pulse-amber",
+  },
+  red: {
+    label: "High-priority risk",
+    glyph: "✕",
+    classes: "border-state-red/40 bg-state-red/10 text-state-red",
+    pulse: "pulse-red",
+  },
+} as const;
+
+export function RiskBadge({
+  color,
+  label,
+  quiet,
+}: {
+  color: "green" | "yellow" | "red";
+  label?: string;
+  /** Suppress the pulse where many badges appear at once (lists, tables). */
+  quiet?: boolean;
+}) {
+  const config = CONFIG[color];
+  return (
+    <span
+      role="status"
+      aria-label={`${config.label}${label ? `: ${label}` : ""}`}
+      className={`inline-flex items-center gap-1.5 rounded border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.12em] ${config.classes} ${quiet ? "" : config.pulse}`}
+    >
+      <span aria-hidden>{config.glyph}</span>
+      {label ?? config.label}
+    </span>
+  );
+}
