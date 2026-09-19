@@ -41,6 +41,12 @@ export type ThresholdOperator = "lt" | "lte" | "gt" | "gte";
 
 export interface ThresholdCheck {
   field: string;
+  /**
+   * Suffix of this branch's message key, so the console can render the finding
+   * in the reader's language. The engine emits `rule.<code>.<key>`; the English
+   * `explanation` below travels with it as the fallback.
+   */
+  key: string;
   op: ThresholdOperator;
   value: number;
   severity: RiskColor;
@@ -89,6 +95,7 @@ export const RULE_CATALOG: RuleDefinition[] = [
     thresholds: [
       {
         field: LAB_FIELDS.egfr,
+        key: "egfrContra",
         op: "lt",
         value: 30,
         severity: "red",
@@ -97,6 +104,7 @@ export const RULE_CATALOG: RuleDefinition[] = [
       },
       {
         field: LAB_FIELDS.egfr,
+        key: "egfrReduced",
         op: "lt",
         value: 45,
         severity: "yellow",
@@ -123,6 +131,7 @@ export const RULE_CATALOG: RuleDefinition[] = [
     thresholds: [
       {
         field: LAB_FIELDS.potassium,
+        key: "potassiumHigh",
         op: "gte",
         value: 5.5,
         severity: "red",
@@ -130,6 +139,7 @@ export const RULE_CATALOG: RuleDefinition[] = [
       },
       {
         field: LAB_FIELDS.potassium,
+        key: "potassiumUpper",
         op: "gte",
         value: 5.0,
         severity: "yellow",
@@ -137,6 +147,7 @@ export const RULE_CATALOG: RuleDefinition[] = [
       },
       {
         field: LAB_FIELDS.egfr,
+        key: "egfrLow",
         op: "lt",
         value: 30,
         severity: "yellow",
@@ -194,6 +205,7 @@ export const RULE_CATALOG: RuleDefinition[] = [
     thresholds: [
       {
         field: LAB_FIELDS.hba1c,
+        key: "hba1cLow",
         op: "lt",
         value: 7,
         severity: "yellow",
@@ -201,6 +213,7 @@ export const RULE_CATALOG: RuleDefinition[] = [
       },
       {
         field: LAB_FIELDS.egfr,
+        key: "egfrClearance",
         op: "lt",
         value: 45,
         severity: "yellow",
@@ -241,6 +254,7 @@ export const RULE_CATALOG: RuleDefinition[] = [
     thresholds: [
       {
         field: LAB_FIELDS.alt,
+        key: "altHigh",
         op: "gt",
         value: 120,
         severity: "red",
@@ -248,6 +262,7 @@ export const RULE_CATALOG: RuleDefinition[] = [
       },
       {
         field: LAB_FIELDS.alt,
+        key: "altRaised",
         op: "gt",
         value: 40,
         severity: "yellow",

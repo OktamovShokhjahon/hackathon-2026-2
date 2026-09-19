@@ -3,6 +3,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api-client";
 import { useI18n } from "@/lib/i18n";
+import { useClinicalText, type ClinicalText } from "@/lib/clinical-text";
+import { fieldList } from "@/lib/format";
 
 export type TimeOfDay = "morning" | "midday" | "evening" | "anytime";
 
@@ -10,15 +12,22 @@ export interface RoutineStep {
   timeOfDay: TimeOfDay;
   action: string;
   detail: string;
+  /** Message keys for the two lines above; the English is the fallback. */
+  actionKey?: string;
+  detailKey?: string;
 }
 
 export interface PreventionSuggestion {
   code: string;
   title: string;
+  titleKey?: string;
   prevents: string;
+  preventsKey?: string;
   because: string;
+  becauseKey?: string;
+  becauseVars?: Record<string, string | number>;
   routine: RoutineStep[];
-  expected: { horizonDays: number; statement: string; measure: string };
+  expected: { horizonDays: number; statement: string; measure: string; statementKey?: string; measureKey?: string };
   observed?: { field: string; label: string; value: number; unit?: string };
 }
 
@@ -64,6 +73,7 @@ function ProgramCard({
   friendly?: string;
 }) {
   const { t } = useI18n();
+  const text = useClinicalText();
   const routine = sortRoutine(suggestion.routine);
 
   return (
@@ -73,7 +83,9 @@ function ProgramCard({
           <span className="readout-value shrink-0 text-[11px] text-ink-faint">
             {String(index + 1).padStart(2, "0")}
           </span>
-          <h3 className="display text-[17px] leading-snug text-ink">{suggestion.title}</h3>
+          <h3 className="display text-[17px] leading-snug text-ink">
+            {text(suggestion.titleKey, suggestion.title)}
+          </h3>
         </div>
 
         {friendly && (
@@ -85,7 +97,7 @@ function ProgramCard({
           </p>
         )}
         <p className="mt-2.5 pl-[30px] text-[13px] leading-relaxed text-ink-muted">
-          {suggestion.because}
+          {text(suggestion.becauseKey, suggestion.because, suggestion.becauseVars)}
         </p>
 
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 pl-[30px]">
@@ -94,7 +106,7 @@ function ProgramCard({
               className="inline-flex items-baseline gap-1.5 rounded border px-2 py-1"
               style={{ borderColor: "var(--line-strong)" }}
             >
-              <span className="readout">{suggestion.observed.label}</span>
+              <span className="readout">{fieldList([suggestion.observed.field])}</span>
               <span className="readout-value text-[13px] text-ink">
                 {suggestion.observed.value}
                 {suggestion.observed.unit ? ` ${suggestion.observed.unit}` : ""}
@@ -102,7 +114,7 @@ function ProgramCard({
             </span>
           )}
           <span className="text-[12px] leading-snug text-ink-faint">
-            {t("prevention.guardsAgainst")} {suggestion.prevents}
+            {t("prevention.guardsAgainst")} {text(suggestion.preventsKey, suggestion.prevents)}
           </span>
         </div>
       </div>
@@ -118,8 +130,10 @@ function ProgramCard({
             >
               <span className="readout pt-0.5">{t(TIME_KEY[step.timeOfDay])}</span>
               <div className="min-w-0">
-                <p className="text-[14px] leading-snug text-ink">{step.action}</p>
-                <p className="mt-1 text-[12.5px] leading-relaxed text-ink-faint">{step.detail}</p>
+                <p className="text-[14px] leading-snug text-ink">{text(step.actionKey, step.action)}</p>
+                <p className="mt-1 text-[12.5px] leading-relaxed text-ink-faint">
+                  {text(step.detailKey, step.detail)}
+                </p>
               </div>
             </li>
           ))}
@@ -137,10 +151,10 @@ function ProgramCard({
           </span>
         </div>
         <p className="mt-2 text-[13.5px] leading-relaxed text-ink">
-          {suggestion.expected.statement}
+          {text(suggestion.expected.statementKey, suggestion.expected.statement)}
         </p>
         <p className="mt-2 text-[12px] leading-relaxed text-ink-faint">
-          {t("prevention.measuredBy")} {suggestion.expected.measure}
+          {t("prevention.measuredBy")} {text(suggestion.expected.measureKey, suggestion.expected.measure)}
         </p>
       </div>
     </article>
@@ -160,7 +174,7 @@ function PlanBody({ plan }: { plan: PreventionPlan }) {
         </p>
         {plan.missingData.length > 0 && (
           <p className="mt-3 text-[12px] leading-relaxed text-state-amber">
-            {t("prevention.stillMissing")} {plan.missingData.join(" · ")}
+            {t("prevention.stillMissing")} {fieldList(plan.missingData)}
           </p>
         )}
       </div>
@@ -188,7 +202,7 @@ function PlanBody({ plan }: { plan: PreventionPlan }) {
         >
           <span className="readout text-state-amber">{t("prevention.sharpen")}</span>
           <p className="mt-2 text-[13px] leading-relaxed text-ink-muted">
-            {t("prevention.sharpenBody", { list: plan.missingData.join(" · ") })}
+            {t("prevention.sharpenBody", { list: fieldList(plan.missingData) })}
           </p>
         </div>
       )}

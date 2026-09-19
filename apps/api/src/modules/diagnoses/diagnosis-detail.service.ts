@@ -3,6 +3,7 @@ import { Types } from "mongoose";
 import { env } from "../../config/env";
 import { HttpError } from "../../middleware/errorHandler";
 import { callGeminiStructured } from "../ai-analysis/gemini.client";
+import { languageName } from "../ai-analysis/language";
 import { Diagnosis } from "./diagnosis.model";
 
 const PROMPT_VERSION = "diagnosis-detail@1";
@@ -26,6 +27,8 @@ export async function generateDiagnosisDetail(params: {
   tenantId: string;
   patientId: string;
   diagnosisId: string;
+  /** Interface language: this text is read straight off the console. */
+  language?: string;
 }) {
   const diagnosis = await Diagnosis.findOne({
     _id: params.diagnosisId,
@@ -42,6 +45,7 @@ export async function generateDiagnosisDetail(params: {
       "Hard constraints: never state a numeric threshold, target value, dose or specific drug name. " +
       "Never recommend a treatment. Name the category of a test rather than its cut-off. " +
       "If the label is too vague to expand safely, say so in the summary and return empty arrays. " +
+      `Write every string in ${languageName(params.language)}; keep test and drug names as they are. ` +
       'Return strict JSON: {"summary": string, "monitoring": string[], "verifyBeforeTreating": string[], "redFlags": string[]}.',
     userPrompt: JSON.stringify({
       diagnosisLabel: diagnosis.label,
@@ -52,6 +56,7 @@ export async function generateDiagnosisDetail(params: {
     tenantId: params.tenantId,
     promptVersion: PROMPT_VERSION,
     temperature: 0.2,
+    language: params.language,
   });
 
   if (!result.ok || !result.data) {

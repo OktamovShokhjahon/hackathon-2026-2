@@ -7,12 +7,22 @@ export interface OrganSignal {
   severity: "low" | "moderate" | "high";
   color: "green" | "yellow" | "red";
   explanation: string;
+  /**
+   * Message key for `explanation`, and the values it interpolates. The console
+   * renders the key so a stored analysis follows the reader's language switch;
+   * `explanation` above is the English fallback for anything the dictionary
+   * has not caught up with, and for analyses written before the keys existed.
+   */
+  explanationKey?: string;
+  explanationVars?: Record<string, string | number>;
   evidenceRecordIds: string[];
   missingData: string[];
   /** The values the rule actually read, so the finding can be checked. */
   observed?: Array<{ field: string; label: string; value: number; unit?: string }>;
   /** Deterministic follow-up note from the catalog, never model-written. */
   monitoring?: string;
+  /** Message key for `monitoring`, for the same reason. */
+  monitoringKey?: string;
   ruleCode?: string;
 }
 
@@ -88,10 +98,13 @@ const treatmentScenarioSchema = new Schema<TreatmentScenarioDoc>(
         severity: { type: String, enum: ["low", "moderate", "high"] },
         color: { type: String, enum: ["green", "yellow", "red"] },
         explanation: String,
+        explanationKey: String,
+        explanationVars: { type: Schema.Types.Mixed },
         evidenceRecordIds: [String],
         missingData: [String],
         observed: [{ field: String, label: String, value: Number, unit: String }],
         monitoring: String,
+        monitoringKey: String,
         ruleCode: String,
       },
     ],

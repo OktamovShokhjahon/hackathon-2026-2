@@ -14,6 +14,9 @@ import { medicationRouter, allergyRouter } from "../medications/medication.route
 import { treatmentScenarioRouter } from "../ai-analysis/treatment-scenario.routes";
 import { documentUploadRouter } from "../documents/document.routes";
 import { getPreventionPlanForPatient } from "../prevention/prevention.service";
+import { explainPreventionPlan } from "../prevention/prevention-narrative.service";
+import { getChainReportForPatient } from "../chronic-chains/chain.service";
+import { runDeepAnalysis } from "../deep-analysis/deep-analysis.service";
 
 export const patientRouter = Router();
 
@@ -77,7 +80,61 @@ patientRouter.get("/:patientId", requireRole("DOCTOR", "ADMIN"), async (req, res
 patientRouter.get("/:patientId/prevention-plan", requireRole("DOCTOR"), async (req, res, next) => {
   try {
     const plan = await getPreventionPlanForPatient(req.auth!.tenantId, req.params.patientId);
-    res.json(plan);
+    // The doctor reads the same plan in the language their console is in.
+    const lang = typeof req.query.lang === "string" ? req.query.lang : undefined;
+    res.json({ ...plan, plainLanguage: await explainPreventionPlan(plan, req.auth!.tenantId, lang) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * The chronic-disease chain map: which of this patient's conditions can lead
+ * on to which others, and what to do about each. The links come from the
+ * reviewed catalog; the advice inside them is model-written and unverified.
+ * Doctors only — an admin has no clinical view.
+ */
+patientRouter.get("/:patientId/chronic-chains", requireRole("DOCTOR"), async (req, res, next) => {
+  try {
+    const report = await getChainReportForPatient({
+      tenantId: req.auth!.tenantId,
+      patientId: req.params.patientId,
+      language: typeof req.query.lang === "string" ? req.query.lang : undefined,
+    });
+    res.json(report);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * Deep analysis for the doctor: the whole verified record, rule results,
+ * trends and projections, drug labels and literature. POST because it runs a
+ * model and web search and is recorded in the audit log; the answer is cached
+ * for a short while so repeat clicks do not spend quota.
+ */
+patientRouter.post("/:patientId/deep-analysis", requireRole("DOCTOR"), async (req, res, next) => {
+  try {
+    const language = typeof req.body?.language === "string" ? req.body.language : undefined;
+    const report = await runDeepAnalysis({
+      tenantId: req.auth!.tenantId,
+      patientId: req.params.patientId,
+      audience: "doctor",
+      language,
+      refresh: req.body?.refresh === true,
+    });
+    await recordAuditEvent({
+      tenantId: req.auth!.tenantId,
+      actorId: req.auth!.userId,
+      actorRole: req.auth!.role,
+      action: "deep_analysis.run",
+      targetType: "PatientProfile",
+      targetId: req.params.patientId,
+      modelId: report.ai.modelId,
+      ruleSetVersion: report.coverage.ruleSetVersion,
+      afterSummary: { readings: report.coverage.readings, literatureSources: report.coverage.literatureSources },
+    });
+    res.json(report);
   } catch (err) {
     next(err);
   }

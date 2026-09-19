@@ -56,6 +56,7 @@ export async function explainPreventionPlan(plan: PreventionPlan, tenantId?: str
     tenantId,
     promptVersion: PROMPT_VERSION,
     temperature: 0.3,
+    language,
   });
   if (!result.ok || !result.data) return undefined;
 

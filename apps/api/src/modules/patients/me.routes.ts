@@ -11,6 +11,8 @@ import { Medication } from "../medications/medication.model";
 import { TreatmentScenario } from "../ai-analysis/treatment-scenario.model";
 import { getPreventionPlanForPatient } from "../prevention/prevention.service";
 import { explainPreventionPlan } from "../prevention/prevention-narrative.service";
+import { runDeepAnalysis } from "../deep-analysis/deep-analysis.service";
+import { recordAuditEvent } from "../audit/audit.service";
 
 export const meRouter = Router();
 meRouter.use(requireAuth, requireRole("PATIENT"));
@@ -100,6 +102,38 @@ meRouter.get("/prevention-plan", async (req, res, next) => {
     const plan = await getPreventionPlanForPatient(req.auth!.tenantId, String(profile._id));
     const lang = typeof req.query.lang === "string" ? req.query.lang : undefined;
     res.json({ ...plan, plainLanguage: await explainPreventionPlan(plan, req.auth!.tenantId, lang) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * The patient's own deep analysis. Same engine as the doctor's, narrowed: only
+ * verified readings, only scenarios the doctor approved and published, no drug
+ * label detail and no considerations aimed at a prescriber.
+ */
+meRouter.post("/deep-analysis", async (req, res, next) => {
+  try {
+    const profile = await getOwnProfile(req.auth!.userId, req.auth!.tenantId);
+    const language = typeof req.body?.language === "string" ? req.body.language : undefined;
+    const report = await runDeepAnalysis({
+      tenantId: req.auth!.tenantId,
+      patientId: String(profile._id),
+      audience: "patient",
+      language,
+      refresh: req.body?.refresh === true,
+    });
+    await recordAuditEvent({
+      tenantId: req.auth!.tenantId,
+      actorId: req.auth!.userId,
+      actorRole: req.auth!.role,
+      action: "deep_analysis.run",
+      targetType: "PatientProfile",
+      targetId: String(profile._id),
+      modelId: report.ai.modelId,
+      ruleSetVersion: report.coverage.ruleSetVersion,
+    });
+    res.json(report);
   } catch (err) {
     next(err);
   }

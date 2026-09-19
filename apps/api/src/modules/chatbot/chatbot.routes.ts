@@ -18,7 +18,11 @@ chatbotRouter.post("/conversations", async (req, res, next) => {
   }
 });
 
-const messageSchema = z.object({ message: z.string().min(1).max(4000) });
+const messageSchema = z.object({
+  message: z.string().min(1).max(4000),
+  /** The console's language: what to answer in when the message itself is ambiguous. */
+  language: z.enum(["en", "ru", "uz"]).optional(),
+});
 
 chatbotRouter.post("/conversations/:conversationId/messages", chatRateLimit, async (req, res, next) => {
   try {
@@ -29,6 +33,7 @@ chatbotRouter.post("/conversations/:conversationId/messages", chatRateLimit, asy
       role: req.auth!.role,
       conversationId: req.params.conversationId,
       message: input.message,
+      language: input.language,
     });
     res.json(result);
   } catch (err) {

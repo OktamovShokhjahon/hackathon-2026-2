@@ -11,6 +11,7 @@ import { runClinicalRules, type PatientSnapshot } from "./rule-engine";
 import { callGeminiStructured, NARRATIVE_SCHEMA } from "./gemini.client";
 import { AIJob } from "./ai-job.model";
 import { RULE_SET_VERSION } from "./rule-catalog";
+import { languageName } from "./language";
 
 const PROMPT_VERSION = "treatment-scenario-narrative@1";
 
@@ -47,6 +48,8 @@ export interface CreateTreatmentScenarioInput {
   /** End of the projection window, chosen by the doctor. */
   projectionTo: Date;
   createdBy: string;
+  /** Interface language, so the explanation is readable by whoever asked for it. */
+  language?: string;
 }
 
 const DAY_MS = 1000 * 60 * 60 * 24;
@@ -134,6 +137,7 @@ export async function createTreatmentScenario(input: CreateTreatmentScenarioInpu
     systemPrompt:
       "You are a clinical explanation assistant. You ONLY explain deterministic rule results already computed by the system. " +
       "Never invent thresholds, drug choices, or contraindications. If information is insufficient, say so. " +
+      `Write the narrative in ${languageName(input.language)}; keep drug names, lab names and units as they are. ` +
       'Return strict JSON: {"narrative": string, "confidence": "limited"|"moderate"|"high"}.',
     userPrompt: JSON.stringify({
       diagnoses: snapshot.diagnosisLabels,
@@ -145,6 +149,7 @@ export async function createTreatmentScenario(input: CreateTreatmentScenarioInpu
     schema: NARRATIVE_SCHEMA,
     tenantId: input.tenantId,
     promptVersion: PROMPT_VERSION,
+    language: input.language,
   });
 
   aiJob.status = aiResult.ok ? "completed" : "failed";

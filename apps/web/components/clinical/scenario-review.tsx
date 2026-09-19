@@ -81,7 +81,7 @@ export function ScenarioReview({
   });
 
   const recalculate = useMutation({
-    mutationFn: () => api.post(`/treatment-scenarios/${scenario._id}/recalculate`),
+    mutationFn: () => api.post(`/treatment-scenarios/${scenario._id}/recalculate`, { language: locale }),
     onSuccess: () => {
       toast(t("sr.reran"));
       queryClient.invalidateQueries({ queryKey: ["scenarios", patientId] });

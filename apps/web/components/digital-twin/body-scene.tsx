@@ -20,6 +20,8 @@ import {
 import type { Projection } from "./organ-labels";
 import type { OrganSignal, RiskColor } from "./types";
 import { useI18n } from "@/lib/i18n";
+import { signalExplanation, useClinicalText } from "@/lib/clinical-text";
+import { fieldList } from "@/lib/format";
 
 export type TwinView = "front" | "back" | "left" | "right";
 
@@ -97,6 +99,7 @@ function Organ({
   onSelect: (key: string | null) => void;
 }) {
   const { t } = useI18n();
+  const text = useClinicalText();
   const groupRef = useRef<THREE.Group>(null);
   const [hovered, setHovered] = useState(false);
   const materials = useRef<THREE.MeshStandardMaterial[]>([]);
@@ -310,13 +313,13 @@ function Organ({
 
             <p className="mt-2 text-[12px] leading-relaxed text-[#9db0bc]">
               {hoveredSignal
-                ? hoveredSignal.explanation
+                ? signalExplanation(text, hoveredSignal)
                 : t("twin.notAssessedBody")}
             </p>
 
             {hoveredSignal && hoveredSignal.missingData.length > 0 && (
               <p className="mt-2 font-mono text-[9px] uppercase leading-relaxed tracking-[0.1em] text-state-amber">
-                Missing: {hoveredSignal.missingData.join(" · ")}
+                {t("twin.missingPrefix")} {fieldList(hoveredSignal.missingData)}
               </p>
             )}
           </div>

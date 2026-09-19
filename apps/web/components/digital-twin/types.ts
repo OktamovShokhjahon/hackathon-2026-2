@@ -5,11 +5,21 @@ export interface OrganSignal {
   severity: "low" | "moderate" | "high";
   color: RiskColor;
   explanation: string;
+  /**
+   * Message key for `explanation`, and the values it quotes. The rule catalog
+   * lives on the API; its wording lives in the console dictionaries, so a
+   * stored analysis follows the language switch instead of staying in the
+   * language it was written in.
+   */
+  explanationKey?: string;
+  explanationVars?: Record<string, string | number>;
   missingData: string[];
   /** Values the rule actually read, so a finding can be checked against data. */
   observed?: Array<{ field: string; label?: string; value: number; unit?: string }>;
   /** Deterministic follow-up note from the rule catalog. */
   monitoring?: string;
+  /** Message key for `monitoring`, for the same reason. */
+  monitoringKey?: string;
   /** Catalog code of the rule that raised this signal. */
   ruleCode?: string;
   /**

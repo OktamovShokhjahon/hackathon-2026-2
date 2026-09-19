@@ -8,10 +8,37 @@ import { useI18n } from "@/lib/i18n";
 import { MARKETING_COPY } from "@/lib/marketing-content";
 import type { MessageKey } from "@/lib/locales/uz";
 
-const PLANS: Array<{ name: MessageKey; price: MessageKey; period: MessageKey; detail: MessageKey }> = [
-  { name: "home.plan.demo", price: "home.plan.demoPrice", period: "home.plan.demoPeriod", detail: "home.plan.demoDetail" },
-  { name: "home.plan.monthly", price: "home.plan.monthlyPrice", period: "home.plan.monthlyPeriod", detail: "home.plan.monthlyDetail" },
-  { name: "home.plan.yearly", price: "home.plan.yearlyPrice", period: "home.plan.yearlyPeriod", detail: "home.plan.yearlyDetail" },
+const PLANS: Array<{
+  name: MessageKey;
+  price: MessageKey;
+  period: MessageKey;
+  yearly: MessageKey;
+  detail: MessageKey;
+  /** The tier most clinics land on, called out so the grid has one focus. */
+  featured?: boolean;
+}> = [
+  {
+    name: "home.plan.start",
+    price: "home.plan.startPrice",
+    period: "home.plan.startPeriod",
+    yearly: "home.plan.startYearly",
+    detail: "home.plan.startDetail",
+  },
+  {
+    name: "home.plan.plus",
+    price: "home.plan.plusPrice",
+    period: "home.plan.plusPeriod",
+    yearly: "home.plan.plusYearly",
+    detail: "home.plan.plusDetail",
+    featured: true,
+  },
+  {
+    name: "home.plan.enterprise",
+    price: "home.plan.enterprisePrice",
+    period: "home.plan.enterprisePeriod",
+    yearly: "home.plan.enterpriseYearly",
+    detail: "home.plan.enterpriseDetail",
+  },
 ];
 
 export default function PricingPage() {
@@ -23,32 +50,39 @@ export default function PricingPage() {
       <PageHead eyebrow={page.eyebrow} title={page.title} body={page.body} />
 
       <section className="mx-auto max-w-6xl px-6 pb-16">
+        <p className="mb-6 font-mono text-[11px] uppercase tracking-[0.12em] text-signal">
+          {t("home.planTrial")}
+        </p>
+
         <div className="grid gap-4 sm:grid-cols-3">
           {PLANS.map((plan, index) => (
             <Reveal
               key={plan.name}
               delay={index * 80}
-              className={`panel flex flex-col p-6 ${index === 0 ? "ring-1 ring-signal/40" : ""}`}
+              className={`panel flex flex-col p-6 ${plan.featured ? "ring-1 ring-signal/40" : ""}`}
             >
               <div className="flex items-baseline justify-between">
                 <span className="readout">{t(plan.name)}</span>
-                {index === 0 && (
+                {plan.featured && (
                   <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-signal">
-                    {t("home.planIncluded")}
+                    {t("home.planPopular")}
                   </span>
                 )}
               </div>
               <div className="mt-3 font-display text-[28px] text-ink">{t(plan.price)}</div>
               <div className="font-mono text-[11px] text-ink-faint">{t(plan.period)}</div>
+              {/* The yearly figure is the same plan, so it sits under the
+                  monthly price rather than taking a card of its own. */}
+              <div className="mt-2 font-mono text-[11px] text-ink-muted">{t(plan.yearly)}</div>
               <p className="mt-4 flex-1 text-[14px] leading-relaxed text-ink-muted">{t(plan.detail)}</p>
               <Link
                 href="/register"
                 className={`mt-6 rounded px-4 py-2 text-center text-sm transition ${
-                  index === 0
+                  plan.featured
                     ? "bg-electric font-medium text-white hover:bg-electric/90"
                     : "border text-ink hover:bg-ink/[0.04]"
                 }`}
-                style={index === 0 ? undefined : { borderColor: "var(--line-strong)" }}
+                style={plan.featured ? undefined : { borderColor: "var(--line-strong)" }}
               >
                 {page.cta}
               </Link>
@@ -95,3 +129,4 @@ export default function PricingPage() {
     </MarketingShell>
   );
 }
+

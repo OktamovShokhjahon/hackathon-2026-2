@@ -7,6 +7,8 @@ import { RiskBadge } from "@/components/ui/risk-badge";
 import { EmptyState, MetaItem, PageHeader, Panel, Row, Skeleton } from "@/components/ui/console";
 import { LabTrend, type LabRecord } from "@/components/charts/lab-trend";
 import { PreventionPlanPanel } from "@/components/clinical/prevention-plan";
+import { DeepAnalysis } from "@/components/clinical/deep-analysis";
+import { twinSex } from "@/components/digital-twin/anatomy";
 import { api } from "@/lib/api-client";
 import type { RiskColor } from "@/components/digital-twin/types";
 import { useI18n } from "@/lib/i18n";
@@ -41,6 +43,10 @@ export default function PatientDashboardPage() {
   const medications = useQuery({
     queryKey: ["me-medications"],
     queryFn: () => api.get<Medication[]>("/me/medications"),
+  });
+  const profile = useQuery({
+    queryKey: ["me-profile"],
+    queryFn: () => api.get<{ profile?: { sex?: string } }>("/me/profile"),
   });
   const scenarios = useQuery({
     queryKey: ["approved-scenarios"],
@@ -167,6 +173,10 @@ export default function PatientDashboardPage() {
         <Panel title={t("pd.measurements")}>
           {history.isLoading ? <Skeleton rows={3} /> : <LabTrend records={history.data ?? []} />}
         </Panel>
+      </div>
+
+      <div className="mt-4">
+        <DeepAnalysis endpoint="/me/deep-analysis" audience="patient" sex={twinSex(profile.data?.profile?.sex)} />
       </div>
 
       <PreventionPlanPanel endpoint="/me/prevention-plan" />

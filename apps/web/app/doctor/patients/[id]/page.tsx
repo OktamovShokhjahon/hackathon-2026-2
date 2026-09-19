@@ -17,6 +17,8 @@ import { DocumentIntake } from "@/components/clinical/document-intake";
 import { AnalysisFindings } from "@/components/clinical/analysis-findings";
 import { ScenarioReview } from "@/components/clinical/scenario-review";
 import { PreventionPlanPanel } from "@/components/clinical/prevention-plan";
+import { ChronicChainsPanel } from "@/components/clinical/chronic-chains";
+import { DeepAnalysis } from "@/components/clinical/deep-analysis";
 import { fieldList, humanizeEnum } from "@/lib/format";
 import { api, ApiError } from "@/lib/api-client";
 import { useI18n } from "@/lib/i18n";
@@ -67,11 +69,14 @@ function isoDaysFromNow(days: number): string {
   return new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
 }
 
+/** A rule colour, as the severity word the dictionary carries. */
+const RISK_LEVEL = { green: "low", yellow: "moderate", red: "high" } as const;
+
 function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-type TabId = "chart" | "analysis" | "prevention" | "documents";
+type TabId = "chart" | "analysis" | "deep" | "prevention" | "chains" | "documents";
 
 /** Toggle used to pick what an analysis runs over. Selection sits next to the
  *  button that consumes it, so the two are never screens apart. */
@@ -122,7 +127,7 @@ function SelectChip({
 export default function PatientDetailPage() {
   const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
 
   const [tab, setTab] = useState<TabId>("chart");
 
@@ -175,7 +180,7 @@ export default function PatientDetailPage() {
 
   const generateDetail = useMutation({
     mutationFn: (diagnosisId: string) =>
-      api.post(`/patients/${id}/diagnoses/${diagnosisId}/detail`),
+      api.post(`/patients/${id}/diagnoses/${diagnosisId}/detail`, { language: locale }),
     onSettled: () => {
       setDetailPendingFor(null);
       queryClient.invalidateQueries({ queryKey: ["diagnoses", id] });
@@ -223,6 +228,7 @@ export default function PatientDetailPage() {
         medicationIds: selectedMedicationIds,
         projectionFrom: new Date(projectionFrom).toISOString(),
         projectionTo: new Date(projectionTo).toISOString(),
+        language: locale,
       }),
     onSuccess: () => {
       setAnalysisError(null);
@@ -268,9 +274,11 @@ export default function PatientDetailPage() {
         onChange={(next) => setTab(next as TabId)}
         tabs={[
           { id: "chart", label: t("chart.tabChart") },
-          { id: "analysis", label: t("chart.tabAnalysis") },
-          { id: "prevention", label: t("chart.tabPrevention") },
           { id: "documents", label: t("chart.tabDocuments") },
+          { id: "analysis", label: t("chart.tabAnalysis") },
+          { id: "deep", label: t("chart.tabDeep") },
+          { id: "prevention", label: t("chart.tabPrevention") },
+          { id: "chains", label: t("chart.tabChains") },
         ]}
       />
 
@@ -547,7 +555,7 @@ export default function PatientDetailPage() {
                   </p>
                   {latestScenario.missingData.length > 0 && (
                     <p className="mt-1 font-mono text-[11px] text-state-amber">
-                      Incomplete — {fieldList(latestScenario.missingData)} not on file
+                      {t("af.incomplete", { fields: fieldList(latestScenario.missingData) })}
                     </p>
                   )}
                 </div>
@@ -565,6 +573,8 @@ export default function PatientDetailPage() {
                     signals: latestScenario.signals,
                     ruleSetVersion: latestScenario.ruleSetVersion,
                     modelId: latestScenario.modelId,
+                    horizonDays: latestScenario.horizonDays,
+                    overallRiskLevel: RISK_LEVEL[latestScenario.overallRisk],
                   }}
                 />
               </div>
@@ -589,8 +599,20 @@ export default function PatientDetailPage() {
         </div>
       )}
 
+      {/* ----------------------------------------------------- deep analysis */}
+      {tab === "deep" && (
+        <DeepAnalysis
+          endpoint={`/patients/${id}/deep-analysis`}
+          audience="doctor"
+          sex={twinSex(patient?.profile?.sex)}
+        />
+      )}
+
       {/* ------------------------------------------------------ prevention */}
       {tab === "prevention" && <PreventionPlanPanel endpoint={`/patients/${id}/prevention-plan`} />}
+
+      {/* ---------------------------------------------------------- chains */}
+      {tab === "chains" && <ChronicChainsPanel endpoint={`/patients/${id}/chronic-chains`} />}
 
       {/* ------------------------------------------------------- documents */}
       {tab === "documents" && <DocumentIntake patientId={id} />}

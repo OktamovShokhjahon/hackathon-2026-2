@@ -17,8 +17,19 @@ export const env = {
   jwtRefreshSecret: required("JWT_REFRESH_SECRET", "dev_refresh_secret_change_me"),
   accessTokenTtl: process.env.JWT_ACCESS_TTL ?? "15m",
   refreshTokenTtl: process.env.JWT_REFRESH_TTL ?? "7d",
-  geminiApiKey: process.env.GEMINI_API_KEY ?? "",
-  geminiModel: process.env.GEMINI_MODEL ?? "gemini-2.5-flash",
+  // Never hard-code a key here: a committed key leaks and then gets revoked,
+  // which is indistinguishable from "the AI is broken". Set it in .env.
+  geminiApiKey: process.env.GEMINI_API_KEY,
+  geminiModel: process.env.GEMINI_MODEL ?? "gemini-3.6-flash",
+  // The free tier caps requests per day per model, so one model running dry
+  // must not take every AI panel down with it. Tried in order after the
+  // primary, on an exhausted, retired or overloaded model only. Ordered by
+  // speed, not quality: a stand-in is already a degraded answer, and a slow
+  // one just burns the time budget before the next model gets a turn.
+  geminiFallbackModels: (process.env.GEMINI_FALLBACK_MODELS ?? "gemini-3.1-flash-lite,gemini-3.5-flash")
+    .split(",")
+    .map((m) => m.trim())
+    .filter(Boolean),
   aiTenantPerMinute: Number(process.env.AI_TENANT_PER_MINUTE ?? 8),
   aiGlobalPerMinute: Number(process.env.AI_GLOBAL_PER_MINUTE ?? 12),
   demoAiFallback: process.env.DEMO_AI_FALLBACK === "true",

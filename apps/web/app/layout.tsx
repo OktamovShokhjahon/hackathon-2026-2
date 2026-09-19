@@ -18,6 +18,10 @@ import { I18nProvider, localeBootScript } from "@/lib/i18n";
 export const metadata: Metadata = {
   title: "MAYOQ AI · Klinik qaror qo'llab-quvvatlash",
   description: "AI-assisted chronic-care and medication-safety decision support.",
+  icons: {
+    icon: [{ url: "/logo.svg", type: "image/svg+xml" }],
+    apple: "/logo.webp",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

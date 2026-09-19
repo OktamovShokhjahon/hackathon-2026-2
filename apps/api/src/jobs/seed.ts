@@ -8,7 +8,7 @@ import { Diagnosis } from "../modules/diagnoses/diagnosis.model";
 import { Medication } from "../modules/medications/medication.model";
 import { MedicalRecord } from "../modules/medical-records/medical-record.model";
 import { createTreatmentScenario, reviewScenario } from "../modules/ai-analysis/treatment-analysis.service";
-import { approvePatientSummary } from "../modules/ai-analysis/patient-summary.service";
+import { generatePatientSummary, approvePatientSummary } from "../modules/ai-analysis/patient-summary.service";
 import { TreatmentScenario } from "../modules/ai-analysis/treatment-scenario.model";
 import { Allergy } from "../modules/medications/allergy.model";
 import { Tenant } from "../modules/tenants/tenant.model";
@@ -16,6 +16,47 @@ import { Subscription } from "../modules/subscriptions/subscription.model";
 import { AuditEvent } from "../modules/audit/audit-event.model";
 import { DocumentModel } from "../modules/documents/document.model";
 import { AIJob } from "../modules/ai-analysis/ai-job.model";
+import { generateDemoCases, type GeneratedCase } from "./case-generator";
+
+/**
+ * Seeds one demo clinic of synthetic patients.
+ *
+ * Sign-in details are fixed here — a demo nobody can log into is useless — and
+ * everything clinical is generated: the model invents the conditions,
+ * medications, allergies and result histories, and the product's own pipeline
+ * then produces the findings from them, exactly as it would for a real patient.
+ * Nothing in this file states a risk, a colour or a conclusion.
+ *
+ * Never run against a production database.
+ */
+
+/** The accounts. These, and only these, are written by hand. */
+const LOGINS = {
+  clinic: {
+    clinicName: "TwinRx Demo Clinic",
+    contactEmail: "demo@twinrx.example",
+    adminFullName: "Demo Admin",
+    adminEmail: "admin@twinrx.example",
+    password: "DemoAdminPass123!",
+  },
+  doctor: { fullName: "Dr. Aziza Karimova", email: "doctor@twinrx.example", password: "DemoDoctorPass123!" },
+  patientPassword: "DemoPatientPass123!",
+  patients: {
+    alpha: { fullName: "Synthetic Patient Alpha", email: "patient1@twinrx.example" },
+    beta: { fullName: "Synthetic Patient Beta", email: "patient2@twinrx.example" },
+    gamma: { fullName: "Synthetic Patient Gamma", email: "patient3@twinrx.example" },
+  },
+} as const;
+
+/**
+ * The free tier counts requests per minute, and this script makes several in a
+ * row. Spacing them keeps the seed from being throttled halfway through and
+ * silently producing analyses without their written explanations.
+ */
+const AI_CALL_SPACING_MS = 14000;
+function pace(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, AI_CALL_SPACING_MS));
+}
 
 /** Projection windows are absolute dates, so seeded scenarios read like real ones. */
 function daysFromNow(days: number): Date {
@@ -40,10 +81,6 @@ async function backdateScenario(scenarioId: Types.ObjectId, days: number): Promi
   );
 }
 
-/**
- * Seeds one demo clinic with three clearly fictional synthetic patients, per
- * spec section 23. Never run against a production database.
- */
 async function seed() {
   await connectDb();
 
@@ -62,348 +99,195 @@ async function seed() {
     logger.info({ tenantId: String(existing._id) }, "Removed the previous demo clinic");
   }
 
-  const { tenant, admin } = await registerClinic({
-    clinicName: "TwinRx Demo Clinic",
-    contactEmail: "demo@twinrx.example",
-    adminFullName: "Demo Admin",
-    adminEmail: "admin@twinrx.example",
-    password: "DemoAdminPass123!",
-  });
+  // Generated before anything is written, so a failure here leaves no clinic
+  // behind and never falls back to canned values.
+  logger.info("Generating synthetic cases with the model...");
+  const generated = await generateDemoCases();
+  logger.info(
+    { modelId: generated.modelId, cases: generated.cases.map((c) => `${c.slot}:${c.patientCode}`) },
+    "Cases generated"
+  );
 
-  const doctorPasswordHash = await hashPassword("DemoDoctorPass123!");
+  const { tenant, admin } = await registerClinic(LOGINS.clinic);
+
+  const doctorPasswordHash = await hashPassword(LOGINS.doctor.password);
   const doctor = await User.create({
     tenantId: tenant._id,
     role: "DOCTOR",
-    fullName: "Dr. Aziza Karimova",
-    email: "doctor@twinrx.example",
+    fullName: LOGINS.doctor.fullName,
+    email: LOGINS.doctor.email,
     passwordHash: doctorPasswordHash,
     status: "active",
     createdBy: admin._id,
   });
 
-  const patientPasswordHash = await hashPassword("DemoPatientPass123!");
+  const patientPasswordHash = await hashPassword(LOGINS.patientPassword);
 
-  async function createSyntheticPatient(fullName: string, email: string, code: string) {
+  /**
+   * Writes one generated case into the record as a patient with a fixed login.
+   * The order matters: results go in before any analysis runs, so the rules
+   * read the same history a doctor would see on the chart.
+   */
+  async function seedCase(item: GeneratedCase) {
+    const login = LOGINS.patients[item.slot];
     const user = await User.create({
       tenantId: tenant._id,
       role: "PATIENT",
-      fullName,
-      email,
+      fullName: login.fullName,
+      email: login.email,
       passwordHash: patientPasswordHash,
       status: "active",
       createdBy: doctor._id,
     });
+
     const profile = await PatientProfile.create({
       tenantId: tenant._id,
       userId: user._id,
-      patientCode: code,
-      dateOfBirth: new Date("1975-04-12"),
-      sex: "unknown",
+      patientCode: item.patientCode,
+      // Year of birth only: a generated day and month would be invented detail
+      // with no purpose, and age is all any rule or projection reads.
+      dateOfBirth: new Date(Date.UTC(item.birthYear, 0, 1)),
+      sex: item.sex,
+      smokingStatus: item.smokingStatus,
+      heightCm: item.heightCm,
+      weightKg: item.weightKg,
       status: "ACTIVE",
       consentStatus: "granted",
       assignedDoctorIds: [doctor._id],
     });
-    return { user, profile };
-  }
 
-  // Patient 1: T2DM with incomplete renal labs -> yellow kidney signal
-  const p1 = await createSyntheticPatient("Synthetic Patient Alpha", "patient1@twinrx.example", "PT-DEMO-A1");
-  const p1Diagnosis = await Diagnosis.create({
-    tenantId: tenant._id,
-    patientId: p1.profile._id,
-    label: "Type 2 diabetes mellitus",
-    state: "active",
-    diagnosedAt: new Date("2023-01-15"),
-    createdBy: doctor._id,
-  });
-  const p1Medication = await Medication.create({
-    tenantId: tenant._id,
-    patientId: p1.profile._id,
-    genericName: "Metformin",
-    dosage: 500,
-    unit: "mg",
-    route: "oral",
-    frequency: "twice daily",
-    startDate: new Date(),
-    status: "active",
-    purpose: "Glycemic control",
-    createdBy: doctor._id,
-  });
-  await MedicalRecord.create({
-    tenantId: tenant._id,
-    patientId: p1.profile._id,
-    type: "lab_result",
-    eventDate: new Date("2025-11-01"),
-    data: { field: "latestHba1c", value: 7.8, unit: "%" },
-    sourceType: "laboratory",
-    verificationStatus: "verified",
-    verifiedBy: doctor._id,
-    verifiedAt: new Date(),
-    createdBy: doctor._id,
-  });
-  // Renal labs intentionally omitted to trigger the yellow kidney-monitoring signal.
-  const p1Scenario = await createTreatmentScenario({
-    tenantId: String(tenant._id),
-    patientId: String(p1.profile._id),
-    diagnosisIds: [String(p1Diagnosis._id)],
-    medicationIds: [String(p1Medication._id)],
-    projectionTo: daysFromNow(30),
-    createdBy: String(doctor._id),
-  });
-  await backdateScenario(p1Scenario.scenario._id, 11);
-
-  // Patient 2: Hypertension with cardiovascular medication-monitoring signal
-  const p2 = await createSyntheticPatient("Synthetic Patient Beta", "patient2@twinrx.example", "PT-DEMO-B2");
-  // Beta carries the modifiable risk factors, so the prevention plan has
-  // something real to work from: a current smoker with a BMI just over 30.
-  p2.profile.smokingStatus = "current";
-  p2.profile.heightCm = 176;
-  p2.profile.weightKg = 96;
-  await p2.profile.save();
-  const p2Diagnosis = await Diagnosis.create({
-    tenantId: tenant._id,
-    patientId: p2.profile._id,
-    label: "Arterial hypertension",
-    state: "active",
-    diagnosedAt: new Date("2022-06-01"),
-    createdBy: doctor._id,
-  });
-  const p2Medication = await Medication.create({
-    tenantId: tenant._id,
-    patientId: p2.profile._id,
-    genericName: "Lisinopril",
-    dosage: 10,
-    unit: "mg",
-    route: "oral",
-    frequency: "once daily",
-    startDate: new Date(),
-    status: "active",
-    purpose: "Blood pressure control",
-    createdBy: doctor._id,
-  });
-  await Allergy.create({
-    tenantId: tenant._id,
-    patientId: p2.profile._id,
-    substance: "Sulfonamide antibiotics",
-    reaction: "Rash",
-    severity: "moderate",
-    verificationStatus: "verified",
-    createdBy: doctor._id,
-  });
-  await MedicalRecord.insertMany([
-    {
-      tenantId: tenant._id,
-      patientId: p2.profile._id,
-      type: "lab_result",
-      eventDate: daysAgo(40),
-      // At the top of the usual range: enough to raise the ACE-inhibitor
-      // potassium signal without making it a contraindication.
-      data: { field: "latestPotassium", value: 5.2, unit: "mmol/L" },
-      sourceType: "laboratory",
-      verificationStatus: "verified",
-      verifiedBy: doctor._id,
-      verifiedAt: daysAgo(40),
-      createdBy: doctor._id,
-    },
-    {
-      tenantId: tenant._id,
-      patientId: p2.profile._id,
-      type: "lab_result",
-      eventDate: daysAgo(12),
-      // Above the usual 140 target, so the prevention plan can quote a real
-      // number back rather than offering generic advice.
-      data: { field: "latestSystolicBp", value: 152, unit: "mmHg" },
-      sourceType: "doctor_entry",
-      verificationStatus: "verified",
-      verifiedBy: doctor._id,
-      verifiedAt: daysAgo(12),
-      createdBy: doctor._id,
-    },
-    {
-      tenantId: tenant._id,
-      patientId: p2.profile._id,
-      type: "lab_result",
-      eventDate: daysAgo(40),
-      data: { field: "latestCreatinine", value: 1.1, unit: "mg/dL" },
-      sourceType: "laboratory",
-      verificationStatus: "verified",
-      verifiedBy: doctor._id,
-      verifiedAt: daysAgo(40),
-      createdBy: doctor._id,
-    },
-  ]);
-  const p2Scenario = await createTreatmentScenario({
-    tenantId: String(tenant._id),
-    patientId: String(p2.profile._id),
-    diagnosisIds: [String(p2Diagnosis._id)],
-    medicationIds: [String(p2Medication._id)],
-    projectionTo: daysFromNow(30),
-    createdBy: String(doctor._id),
-  });
-  await backdateScenario(p2Scenario.scenario._id, 6);
-  // One scenario arrives already reviewed and published, so the patient-facing
-  // twin has something to show the moment the demo starts.
-  await reviewScenario({
-    tenantId: String(tenant._id),
-    scenarioId: String(p2Scenario.scenario._id),
-    reviewedBy: String(doctor._id),
-    decision: "APPROVED",
-    note: "Potassium at the upper end; continue lisinopril and recheck in two weeks.",
-    visibleToPatient: true,
-  });
-  await approvePatientSummary({
-    tenantId: String(tenant._id),
-    scenarioId: String(p2Scenario.scenario._id),
-    approvedBy: String(doctor._id),
-    text: "Your doctor has reviewed your blood pressure plan. Keep taking lisinopril as instructed and book the blood test in two weeks. The picture of the next 30 days is an illustration, not a promise. Ask your care team if you have questions.",
-  });
-
-  // Patient 3: Combined diabetes + hypertension, mixed green/yellow scenario
-  const p3 = await createSyntheticPatient("Synthetic Patient Gamma", "patient3@twinrx.example", "PT-DEMO-C3");
-  const p3Diagnoses = await Diagnosis.insertMany([
-    {
-      tenantId: tenant._id,
-      patientId: p3.profile._id,
-      label: "Type 2 diabetes mellitus",
-      state: "active",
-      diagnosedAt: new Date("2021-03-01"),
-      createdBy: doctor._id,
-    },
-    {
-      tenantId: tenant._id,
-      patientId: p3.profile._id,
-      label: "Arterial hypertension",
-      state: "active",
-      diagnosedAt: new Date("2021-03-01"),
-      createdBy: doctor._id,
-    },
-  ]);
-  const p3Medications = await Medication.insertMany([
-    {
-      tenantId: tenant._id,
-      patientId: p3.profile._id,
-      genericName: "Atorvastatin",
-      dosage: 20,
-      unit: "mg",
-      route: "oral",
-      frequency: "once daily",
-      startDate: new Date(),
-      status: "active",
-      purpose: "Lipid management",
-      createdBy: doctor._id,
-    },
-  ]);
-  await MedicalRecord.insertMany([
-    {
-      tenantId: tenant._id,
-      patientId: p3.profile._id,
-      type: "lab_result",
-      eventDate: new Date("2025-12-01"),
-      data: { field: "latestAlt", value: 22, unit: "U/L" },
-      sourceType: "laboratory",
-      verificationStatus: "verified",
-      verifiedBy: doctor._id,
-      verifiedAt: new Date(),
-      createdBy: doctor._id,
-    },
-    {
-      tenantId: tenant._id,
-      patientId: p3.profile._id,
-      type: "lab_result",
-      eventDate: new Date("2025-12-01"),
-      data: { field: "latestAst", value: 19, unit: "U/L" },
-      sourceType: "laboratory",
-      verificationStatus: "verified",
-      verifiedBy: doctor._id,
-      verifiedAt: new Date(),
-      createdBy: doctor._id,
-    },
-  ]);
-  const p3Scenario = await createTreatmentScenario({
-    tenantId: String(tenant._id),
-    patientId: String(p3.profile._id),
-    diagnosisIds: p3Diagnoses.map((d) => String(d._id)),
-    medicationIds: p3Medications.map((m) => String(m._id)),
-    projectionTo: daysFromNow(90),
-    createdBy: String(doctor._id),
-  });
-  await backdateScenario(p3Scenario.scenario._id, 3);
-
-  // A proposed NSAID on top of hypertension: the catalog's high-priority case,
-  // so the demo has one red result to open with.
-  const p3Nsaid = await Medication.create({
-    tenantId: tenant._id,
-    patientId: p3.profile._id,
-    genericName: "Ibuprofen",
-    dosage: 400,
-    unit: "mg",
-    route: "oral",
-    frequency: "three times daily",
-    startDate: new Date(),
-    status: "active",
-    purpose: "Knee pain",
-    createdBy: doctor._id,
-  });
-  const p3RedScenario = await createTreatmentScenario({
-    tenantId: String(tenant._id),
-    patientId: String(p3.profile._id),
-    diagnosisIds: p3Diagnoses.map((d) => String(d._id)),
-    medicationIds: [String(p3Nsaid._id)],
-    projectionTo: daysFromNow(90),
-    createdBy: String(doctor._id),
-  });
-  await backdateScenario(p3RedScenario.scenario._id, 1);
-
-  // Measurement history, so the patient's trend chart has a line to draw and
-  // the doctor can see direction, not just the latest value. Every point is
-  // dated before the patient's current reading: the rules take the newest
-  // verified value per field, so this changes what the chart shows and
-  // nothing about the analyses created above.
-  async function addLabHistory(
-    patientId: Types.ObjectId,
-    field: string,
-    unit: string,
-    points: Array<{ daysBack: number; value: number }>
-  ) {
-    await MedicalRecord.insertMany(
-      points.map((point) => ({
+    const diagnoses = await Diagnosis.insertMany(
+      item.diagnoses.map((entry) => ({
         tenantId: tenant._id,
-        patientId,
-        type: "lab_result",
-        eventDate: daysAgo(point.daysBack),
-        data: { field, value: point.value, unit },
-        sourceType: "laboratory",
-        verificationStatus: "verified",
-        verifiedBy: doctor._id,
-        verifiedAt: daysAgo(point.daysBack),
+        patientId: profile._id,
+        label: entry.label,
+        state: "active",
+        diagnosedAt: daysAgo(entry.diagnosedDaysAgo),
         createdBy: doctor._id,
       }))
     );
+
+    const medications = await Medication.insertMany(
+      item.medications.map((entry) => ({
+        tenantId: tenant._id,
+        patientId: profile._id,
+        genericName: entry.genericName,
+        dosage: entry.dosage,
+        unit: entry.unit,
+        route: entry.route,
+        frequency: entry.frequency,
+        // A proposed medicine starts today; established therapy has been
+        // running as long as the condition it treats.
+        startDate: entry.proposed ? new Date() : daysAgo(Math.min(item.diagnoses[0].diagnosedDaysAgo, 400)),
+        status: "active",
+        purpose: entry.purpose,
+        createdBy: doctor._id,
+      }))
+    );
+
+    if (item.allergies.length > 0) {
+      await Allergy.insertMany(
+        item.allergies.map((entry) => ({
+          tenantId: tenant._id,
+          patientId: profile._id,
+          substance: entry.substance,
+          reaction: entry.reaction,
+          severity: entry.severity,
+          verificationStatus: "verified",
+          createdBy: doctor._id,
+        }))
+      );
+    }
+
+    await MedicalRecord.insertMany(
+      item.readings.map((reading) => ({
+        tenantId: tenant._id,
+        patientId: profile._id,
+        type: "lab_result",
+        eventDate: daysAgo(reading.daysAgo),
+        data: { field: reading.field, value: reading.value, unit: reading.unit },
+        sourceType: "laboratory",
+        // Seeded results stand for values a doctor already confirmed, which is
+        // what the rules are allowed to read.
+        verificationStatus: "verified",
+        verifiedBy: doctor._id,
+        verifiedAt: daysAgo(reading.daysAgo),
+        createdBy: doctor._id,
+      }))
+    );
+
+    return { user, profile, diagnoses, medications };
   }
-  // Alpha's current HbA1c (7.8) is dated 2025-11-01, so the history stops
-  // before it; the earlier readings are relative and land well ahead of that.
-  await addLabHistory(p1.profile._id, "latestHba1c", "%", [
-    { daysBack: 700, value: 8.9 },
-    { daysBack: 620, value: 8.6 },
-    { daysBack: 540, value: 8.3 },
-    { daysBack: 470, value: 8.1 },
-  ]);
-  await addLabHistory(p2.profile._id, "latestSystolicBp", "mmHg", [
-    { daysBack: 300, value: 161 },
-    { daysBack: 240, value: 158 },
-    { daysBack: 180, value: 156 },
-    { daysBack: 120, value: 155 },
-    { daysBack: 60, value: 153 },
-  ]);
+
+  const seeded: Record<string, Awaited<ReturnType<typeof seedCase>>> = {};
+  for (const item of generated.cases) {
+    seeded[item.slot] = await seedCase(item);
+  }
+
+  // The analyses. These run through the ordinary pipeline — the deterministic
+  // rule catalog over the generated record, explained by the model — so the
+  // demo's findings are produced the same way a real patient's would be.
+  const scenarios: Array<{ slot: string; id: Types.ObjectId }> = [];
+  let age = 11;
+  for (const item of generated.cases) {
+    const entry = seeded[item.slot];
+    await pace();
+    const result = await createTreatmentScenario({
+      tenantId: String(tenant._id),
+      patientId: String(entry.profile._id),
+      diagnosisIds: entry.diagnoses.map((d) => String(d._id)),
+      medicationIds: entry.medications.map((m) => String(m._id)),
+      projectionTo: daysFromNow(item.horizonDays),
+      createdBy: String(doctor._id),
+    });
+    await backdateScenario(result.scenario._id, age);
+    scenarios.push({ slot: item.slot, id: result.scenario._id });
+    // Spread across the past fortnight so the clinic activity chart has shape.
+    age = Math.max(1, age - 5);
+  }
+
+  // One analysis arrives already reviewed and published, so the patient-facing
+  // twin has something to show the moment the demo starts. The doctor's
+  // decision is recorded without a note: inventing words and attributing them
+  // to a named physician is not something a seed should do.
+  const published = scenarios[scenarios.length - 1];
+  await reviewScenario({
+    tenantId: String(tenant._id),
+    scenarioId: String(published.id),
+    reviewedBy: String(doctor._id),
+    decision: "APPROVED",
+    visibleToPatient: true,
+  });
+
+  // The patient-facing wording is written by the model from that analysis, the
+  // same call the console makes, and then approved for publication.
+  await pace();
+  const summary = await generatePatientSummary({
+    tenantId: String(tenant._id),
+    scenarioId: String(published.id),
+  });
+  if (summary.aiAvailable) {
+    await approvePatientSummary({
+      tenantId: String(tenant._id),
+      scenarioId: String(published.id),
+      approvedBy: String(doctor._id),
+    });
+  } else {
+    logger.warn(
+      { error: summary.aiError },
+      "No patient summary was written, so this analysis stays internal. The doctor console can generate it later."
+    );
+  }
 
   logger.info(
     {
       tenantSlug: tenant.slug,
       adminEmail: admin.email,
       doctorEmail: doctor.email,
-      patients: [p1.user.email, p2.user.email, p3.user.email],
+      patients: generated.cases.map((c) => `${LOGINS.patients[c.slot].email} (${c.patientCode})`),
+      generatedBy: generated.modelId,
     },
-    "Seed complete. All data is synthetic and fictional."
+    "Seed complete. Every clinical value was generated; all patients are synthetic and fictional."
   );
 
   await disconnectDb();

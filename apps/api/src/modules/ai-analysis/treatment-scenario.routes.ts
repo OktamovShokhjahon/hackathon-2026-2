@@ -19,6 +19,8 @@ const createScenarioSchema = z.object({
   // projection can be read back against real dates, not a bare day count.
   projectionFrom: z.string().datetime().optional(),
   projectionTo: z.string().datetime(),
+  /** The console's language, so the written explanation matches the page. */
+  language: z.enum(["en", "ru", "uz"]).optional(),
 });
 
 treatmentScenarioRouter.use(requireAuth, requireRole("DOCTOR", "ADMIN"), stripClientTenantId);
@@ -35,6 +37,7 @@ treatmentScenarioRouter.post("/", async (req, res, next) => {
       projectionFrom: input.projectionFrom ? new Date(input.projectionFrom) : undefined,
       projectionTo: new Date(input.projectionTo),
       createdBy: req.auth!.userId,
+      language: input.language,
     });
 
     await recordAuditEvent({
@@ -117,6 +120,7 @@ scenarioReviewRouter.post("/:scenarioId/recalculate", async (req, res, next) => 
       // Re-running keeps the doctor's original window length, measured from now.
       projectionTo: new Date(Date.now() + scenario.horizonDays * 24 * 60 * 60 * 1000),
       createdBy: req.auth!.userId,
+      language: z.enum(["en", "ru", "uz"]).optional().parse(req.body?.language),
     });
 
     res.status(201).json(result);

@@ -2,6 +2,8 @@ import { Schema, model, Types } from "mongoose";
 
 export interface DrugReferenceSection {
   heading: string;
+  /** Message key for `heading`, so the console can label the section itself. */
+  headingKey?: string;
   text: string;
 }
 
@@ -22,6 +24,10 @@ export interface DrugReferenceDoc {
   sources: DrugReferenceSource[];
   /** Plain-language condensation of `sections`, when the model was reachable. */
   plainSummary?: string;
+  /** The cautions the condensation pulled out, kept apart so the console can
+   * head them in its own language rather than receive an English heading
+   * glued onto the summary. */
+  keyCautions?: string[];
   /** False when the matched label covers more than the medicine searched for. */
   exactMatch: boolean;
   fetchedAt: Date;
@@ -36,9 +42,10 @@ const drugReferenceSchema = new Schema<DrugReferenceDoc>(
     rxcui: { type: String },
     genericName: { type: String },
     brandNames: [{ type: String }],
-    sections: [{ heading: String, text: String }],
+    sections: [{ heading: String, headingKey: String, text: String }],
     sources: [{ name: String, url: String }],
     plainSummary: { type: String },
+    keyCautions: [{ type: String }],
     exactMatch: { type: Boolean, default: true },
     fetchedAt: { type: Date, required: true },
   },

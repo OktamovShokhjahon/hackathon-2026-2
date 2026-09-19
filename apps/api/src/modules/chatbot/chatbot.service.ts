@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { callGeminiStructured } from "../ai-analysis/gemini.client";
+import { languageName } from "../ai-analysis/language";
 import { HttpError } from "../../middleware/errorHandler";
 import { ChatConversation } from "./chat-conversation.model";
 import { PatientProfile } from "../patients/patient.model";
@@ -29,6 +30,19 @@ function detectEmergency(message: string): keyof typeof EMERGENCY_PATTERNS | nul
   return order.find((lang) => EMERGENCY_PATTERNS[lang].test(message)) ?? null;
 }
 
+// Said in the language the patient is reading the app in. This text is stored
+// in the conversation like any other reply, so it has to be right the first
+// time: there is no re-rendering it after a language switch.
+const UNAVAILABLE: Record<keyof typeof EMERGENCY_PATTERNS, string> = {
+  en: "The AI assistant is currently unavailable. Please try again later, or contact your care team directly.",
+  ru: "ИИ-помощник сейчас недоступен. Попробуйте позже или обратитесь к своему врачу напрямую.",
+  uz: "AI yordamchi hozir mavjud emas. Keyinroq urinib ko'ring yoki to'g'ridan-to'g'ri shifokoringizga murojaat qiling.",
+};
+
+function interfaceLanguage(code?: string): keyof typeof EMERGENCY_PATTERNS {
+  return code === "ru" || code === "uz" ? code : "en";
+}
+
 const HISTORY_TURNS = 6;
 
 const CHAT_RESPONSE_SCHEMA = z.object({
@@ -44,6 +58,8 @@ export async function sendChatMessage(params: {
   role: "PATIENT" | "DOCTOR" | "ADMIN";
   conversationId?: string;
   message: string;
+  /** The language the patient is reading the app in. */
+  language?: string;
 }) {
   const emergencyLang = detectEmergency(params.message);
   if (emergencyLang) {
@@ -84,7 +100,8 @@ export async function sendChatMessage(params: {
       "3) only use the approved patient context provided, never invent facts; " +
       "4) clearly state you are AI-generated and not a substitute for a clinician; " +
       "5) refuse to reveal information about any other patient; " +
-      "6) reply in the same language the user wrote their latest message in, whatever that language is; " +
+      "6) reply in the same language the user wrote their latest message in, whatever that language is" +
+      `, and when that is unclear — a one-word message, a name, a number — reply in ${languageName(params.language)}; ` +
       "7) if the message describes a medical emergency in any language, tell them to contact emergency services now. " +
       'Return strict JSON: {"reply": string, "isEducationalOnly": true}.',
     userPrompt: JSON.stringify({ previousMessages: history, question: params.message, approvedContext }),
@@ -92,11 +109,10 @@ export async function sendChatMessage(params: {
     schema: CHAT_RESPONSE_SCHEMA,
     promptVersion: PROMPT_VERSION,
     temperature: 0.3,
+    language: params.language,
   });
 
-  const reply = result.ok
-    ? result.data!.reply
-    : "The AI assistant is currently unavailable. Please try again later, or contact your care team directly.";
+  const reply = result.ok ? result.data!.reply : UNAVAILABLE[interfaceLanguage(params.language)];
 
   const conversation = await appendMessage(params, reply, false);
   return { conversation, isEmergency: false, aiAvailable: result.ok };

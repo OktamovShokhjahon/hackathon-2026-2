@@ -10,6 +10,8 @@ import {
 } from "./anatomy";
 import { ProvenanceChip } from "@/components/ui/provenance-chip";
 import { useI18n } from "@/lib/i18n";
+import { signalExplanation, useClinicalText } from "@/lib/clinical-text";
+import { fieldList } from "@/lib/format";
 import type { MessageKey } from "@/lib/locales/uz";
 import type { OrganSignal } from "./types";
 
@@ -31,6 +33,7 @@ export function OrganMap({
   onSelectOrgan?: (key: string | null) => void;
 }) {
   const { t } = useI18n();
+  const text = useClinicalText();
 
   if (signals.length === 0) {
     return <p className="text-sm text-ink-faint">{t("twin.noSignals")}</p>;
@@ -90,14 +93,14 @@ export function OrganMap({
                     {organ ? t(systemLabelKey(organ.system)) : ""} · {t(STATE_LABEL_KEY[signal.color])}
                   </p>
                   <p className="mt-1.5 text-[13px] leading-relaxed text-ink-muted">
-                    {signal.explanation}
+                    {signalExplanation(text, signal)}
                   </p>
                   <div className="mt-2.5">
                     <ProvenanceChip grade={signal.evidence ?? "projection"} />
                   </div>
                   {signal.missingData.length > 0 && (
                     <p className="mt-2 font-mono text-[9px] uppercase tracking-[0.1em] text-state-amber">
-                      {t("twin.missingPrefix")} {signal.missingData.join(" · ")}
+                      {t("twin.missingPrefix")} {fieldList(signal.missingData)}
                     </p>
                   )}
                 </div>

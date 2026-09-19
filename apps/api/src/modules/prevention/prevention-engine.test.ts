@@ -57,7 +57,7 @@ describe("buildPreventionPlan", () => {
       labValues: {},
     });
     expect(plan.suggestions.map((s) => s.code)).toContain("RENAL_MONITORING_GAP");
-    expect(plan.missingData).toContain("latest eGFR");
+    expect(plan.missingData).toContain("latestEgfr");
   });
 
   it("fires the blood-pressure program only above the threshold", () => {

@@ -65,25 +65,32 @@ const PLANS: Array<{
   name: MessageKey;
   price: MessageKey;
   period: MessageKey;
+  yearly: MessageKey;
   detail: MessageKey;
+  /** The tier most clinics land on, called out so the grid has one focus. */
+  featured?: boolean;
 }> = [
   {
-    name: "home.plan.demo",
-    price: "home.plan.demoPrice",
-    period: "home.plan.demoPeriod",
-    detail: "home.plan.demoDetail",
+    name: "home.plan.start",
+    price: "home.plan.startPrice",
+    period: "home.plan.startPeriod",
+    yearly: "home.plan.startYearly",
+    detail: "home.plan.startDetail",
   },
   {
-    name: "home.plan.monthly",
-    price: "home.plan.monthlyPrice",
-    period: "home.plan.monthlyPeriod",
-    detail: "home.plan.monthlyDetail",
+    name: "home.plan.plus",
+    price: "home.plan.plusPrice",
+    period: "home.plan.plusPeriod",
+    yearly: "home.plan.plusYearly",
+    detail: "home.plan.plusDetail",
+    featured: true,
   },
   {
-    name: "home.plan.yearly",
-    price: "home.plan.yearlyPrice",
-    period: "home.plan.yearlyPeriod",
-    detail: "home.plan.yearlyDetail",
+    name: "home.plan.enterprise",
+    price: "home.plan.enterprisePrice",
+    period: "home.plan.enterprisePeriod",
+    yearly: "home.plan.enterpriseYearly",
+    detail: "home.plan.enterpriseDetail",
   },
 ];
 
@@ -312,25 +319,32 @@ export default function LandingPage() {
           </h2>
         </Reveal>
 
+        <p className="mt-6 font-mono text-[11px] uppercase tracking-[0.12em] text-signal">
+          {t("home.planTrial")}
+        </p>
+
         <div className="mt-10 grid gap-4 sm:grid-cols-3">
           {PLANS.map((plan, index) => (
             <Reveal
               key={plan.name}
               delay={index * 90}
               className={`panel p-6 transition hover:-translate-y-1 hover:shadow-lg ${
-                index === 0 ? "ring-1 ring-signal/40" : ""
+                plan.featured ? "ring-1 ring-signal/40" : ""
               }`}
             >
               <div className="flex items-baseline justify-between">
                 <span className="readout">{t(plan.name)}</span>
-                {index === 0 && (
+                {plan.featured && (
                   <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-signal">
-                    {t("home.planIncluded")}
+                    {t("home.planPopular")}
                   </span>
                 )}
               </div>
               <div className="mt-3 font-display text-[26px] text-ink">{t(plan.price)}</div>
               <div className="font-mono text-[11px] text-ink-faint">{t(plan.period)}</div>
+              {/* The yearly figure is the same plan, so it sits under the
+                  monthly price rather than taking a card of its own. */}
+              <div className="mt-2 font-mono text-[11px] text-ink-muted">{t(plan.yearly)}</div>
               <p className="mt-4 text-[14px] leading-relaxed text-ink-muted">{t(plan.detail)}</p>
             </Reveal>
           ))}

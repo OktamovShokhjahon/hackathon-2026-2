@@ -59,6 +59,7 @@ diagnosisRouter.post("/:diagnosisId/detail", async (req, res, next) => {
       tenantId: req.auth!.tenantId,
       patientId: params.patientId,
       diagnosisId: params.diagnosisId,
+      language: z.enum(["en", "ru", "uz"]).optional().parse(req.body?.language),
     });
 
     await recordAuditEvent({

@@ -176,11 +176,11 @@ const uz: Copy = {
   },
   pricing: {
     eyebrow: "Narxlar",
-    title: "Klinika uchun bitta reja, ikki to'lov davri",
+    title: "Klinika o'lchamiga qarab uchta reja",
     body: "Ro'yxatdan o'tgan zahoti 7 kunlik demo yoqiladi. To'liq ish jarayoni, foydalanish chegarasi bilan.",
     includedTitle: "Har bir rejaga kiradi",
     included: [
-      "Cheksiz shifokor va bemor rejaning imkoniyatlari doirasida",
+      "Reja doirasidagi shifokorlar uchun cheksiz bemor",
       "Uch rol: administrator, shifokor, bemor",
       "Raqamli egizak va prognoz ssenariylari",
       "To'liq audit jurnali",
@@ -322,11 +322,11 @@ const en: Copy = {
   },
   pricing: {
     eyebrow: "Pricing",
-    title: "One plan per clinic, two billing periods",
+    title: "Three plans, sized to the clinic",
     body: "A 7-day demo turns on the moment a clinic registers. Full workflow, with usage limits.",
     includedTitle: "Included in every plan",
     included: [
-      "Unlimited doctors and patients within your plan entitlements",
+      "Unlimited patients for the doctors your plan covers",
       "Three roles: admin, doctor, patient",
       "Digital twin and projection scenarios",
       "Full audit log",
@@ -468,11 +468,11 @@ const ru: Copy = {
   },
   pricing: {
     eyebrow: "Тарифы",
-    title: "Один план на клинику, два периода оплаты",
+    title: "Три плана по размеру клиники",
     body: "7-дневное демо включается сразу после регистрации клиники. Полный рабочий процесс с лимитами использования.",
     includedTitle: "Входит в каждый план",
     included: [
-      "Неограниченно врачей и пациентов в рамках возможностей плана",
+      "Неограниченно пациентов для врачей в рамках плана",
       "Три роли: администратор, врач, пациент",
       "Цифровой двойник и сценарии прогноза",
       "Полный журнал аудита",

@@ -6,6 +6,7 @@ import { EmptyState, Skeleton } from "@/components/ui/console";
 import { ProvenanceChip } from "@/components/ui/provenance-chip";
 import { api } from "@/lib/api-client";
 import { useI18n } from "@/lib/i18n";
+import { useClinicalText } from "@/lib/clinical-text";
 import { formatDate } from "@/lib/format";
 
 interface DrugReference {
@@ -14,13 +15,17 @@ interface DrugReference {
   rxcui?: string;
   genericName?: string;
   brandNames: string[];
-  sections: Array<{ heading: string; text: string }>;
+  sections: Array<{ heading: string; headingKey?: string; text: string }>;
   sources: Array<{ name: string; url: string }>;
   plainSummary?: string;
+  /** Pulled out of the summary so the heading above them can be translated. */
+  keyCautions?: string[];
   exactMatch: boolean;
   fetchedAt: string;
   cached: boolean;
   notice: string;
+  noticeKey?: string;
+  noticeVars?: Record<string, string | number>;
 }
 
 /**
@@ -39,10 +44,13 @@ export function DrugReferenceModal({
   open: boolean;
   onClose: () => void;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const text = useClinicalText();
+  // The locale is part of the query key as well as the request: the condensed
+  // summary is written in it, so a language switch is a different answer.
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["drug-reference", name.toLowerCase()],
-    queryFn: () => api.get<DrugReference>(`/drug-reference?name=${encodeURIComponent(name)}`),
+    queryKey: ["drug-reference", name.toLowerCase(), locale],
+    queryFn: () => api.get<DrugReference>(`/drug-reference?name=${encodeURIComponent(name)}&lang=${locale}`),
     enabled: open && name.trim().length > 1,
     staleTime: 1000 * 60 * 30,
   });
@@ -76,7 +84,7 @@ export function DrugReferenceModal({
       {data && !data.found && (
         <EmptyState
           title={t("drug.noLabel")}
-          body={data.notice}
+          body={text(data.noticeKey, data.notice, data.noticeVars)}
         />
       )}
 
@@ -97,7 +105,7 @@ export function DrugReferenceModal({
               role="alert"
               className="rounded border border-state-amber/40 bg-state-amber/10 px-3 py-2 text-[13px] leading-relaxed text-state-amber"
             >
-              {data.notice}
+              {text(data.noticeKey, data.notice, data.noticeVars)}
             </p>
           )}
 
@@ -136,6 +144,18 @@ export function DrugReferenceModal({
               <p className="whitespace-pre-line text-[13px] leading-relaxed text-ink-muted">
                 {data.plainSummary}
               </p>
+              {data.keyCautions && data.keyCautions.length > 0 && (
+                <div className="mt-3">
+                  <span className="readout">{t("drug.keyCautions")}</span>
+                  <ul className="mt-1.5 flex flex-col gap-1">
+                    {data.keyCautions.map((caution) => (
+                      <li key={caution} className="text-[13px] leading-relaxed text-ink-muted">
+                        {caution}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               <p className="mt-3 text-[11px] leading-relaxed text-ink-faint">
                 {t("drug.condensed")}
               </p>
@@ -145,7 +165,7 @@ export function DrugReferenceModal({
           <div className="flex flex-col gap-4">
             {data.sections.map((section) => (
               <section key={section.heading}>
-                <h3 className="readout">{section.heading}</h3>
+                <h3 className="readout">{text(section.headingKey, section.heading)}</h3>
                 <p className="mt-1.5 text-[13px] leading-relaxed text-ink-muted">{section.text}</p>
               </section>
             ))}

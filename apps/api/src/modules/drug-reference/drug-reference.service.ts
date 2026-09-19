@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { logger } from "../../config/logger";
 import { callGeminiStructured } from "../ai-analysis/gemini.client";
-import { DrugReference, type DrugReferenceDoc } from "./drug-reference.model";
+import { languageName } from "../ai-analysis/language";
+import { DrugReference, type DrugReferenceDoc, type DrugReferenceSection } from "./drug-reference.model";
 
 /**
  * Medicine reference lookup.
@@ -23,6 +24,8 @@ const CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 7;
 const FETCH_TIMEOUT_MS = 8000;
 
 /** Label fields worth a clinician's attention, in the order they should read. */
+// `key` names the openFDA field and, as `drug.section.<key>`, the message key
+// the console heads the section with.
 const LABEL_FIELDS: Array<{ key: string; heading: string }> = [
   { key: "boxed_warning", heading: "Boxed warning" },
   { key: "indications_and_usage", heading: "Indications and usage" },
@@ -146,24 +149,26 @@ async function lookupOpenFda(name: string): Promise<Record<string, unknown> | nu
 async function condense(
   name: string,
   sections: Array<{ heading: string; text: string }>,
-): Promise<string | null> {
+  language?: string,
+): Promise<{ summary: string; keyCautions: string[] } | null> {
   const result = await callGeminiStructured({
     systemPrompt:
       "You condense official medicine label text for a clinician. You may ONLY use the label text provided. " +
       "Never add a dose, threshold, interaction or contraindication that is not present in the supplied text. " +
       "If the text does not cover something, leave it out. Do not give a recommendation. " +
+      `Write the summary and the cautions in ${languageName(language)}; keep drug names, dose units and lab names exactly as the label spells them. ` +
       'Return strict JSON: {"summary": string, "keyCautions": string[]}.',
     userPrompt: JSON.stringify({ medicine: name, labelSections: sections }),
     schema: SUMMARY_SCHEMA,
     promptVersion: "drug-reference-condense@1",
     temperature: 0.1,
+    language,
   });
 
   if (!result.ok || !result.data) return null;
-  const cautions = result.data.keyCautions.filter(Boolean);
-  return cautions.length > 0
-    ? result.data.summary + "\n\nKey cautions: " + cautions.join("; ")
-    : result.data.summary;
+  // The cautions travel as a list rather than glued onto the summary under an
+  // English heading: the console heads them in the language it is running in.
+  return { summary: result.data.summary, keyCautions: result.data.keyCautions.filter(Boolean) };
 }
 
 export interface DrugReferenceResult {
@@ -175,11 +180,15 @@ export interface DrugReferenceResult {
   sections: Array<{ heading: string; text: string }>;
   sources: Array<{ name: string; url: string }>;
   plainSummary?: string;
+  keyCautions: string[];
   /** False when the label found covers more than the medicine that was typed. */
   exactMatch: boolean;
   fetchedAt: string;
   cached: boolean;
   notice: string;
+  /** `notice` as a key and its values, so the console can say it in its own words. */
+  noticeKey: string;
+  noticeVars?: Record<string, string | number>;
 }
 
 function toResult(doc: DrugReferenceDoc, query: string, cached: boolean): DrugReferenceResult {
@@ -192,9 +201,16 @@ function toResult(doc: DrugReferenceDoc, query: string, cached: boolean): DrugRe
     sections: doc.sections,
     sources: doc.sources,
     plainSummary: doc.plainSummary,
+    keyCautions: doc.keyCautions ?? [],
     exactMatch: doc.exactMatch !== false,
     fetchedAt: doc.fetchedAt.toISOString(),
     cached,
+    noticeKey: !doc.found
+      ? "drug.notice.none"
+      : doc.exactMatch === false
+        ? "drug.notice.related"
+        : "drug.notice.ok",
+    noticeVars: doc.found && doc.exactMatch === false ? { generic: doc.genericName ?? "" } : undefined,
     notice: !doc.found
       ? "No label found in the public medicines databases for this name. Check the spelling, or use your own formulary."
       : doc.exactMatch === false
@@ -205,18 +221,22 @@ function toResult(doc: DrugReferenceDoc, query: string, cached: boolean): DrugRe
   };
 }
 
-export async function getDrugReference(name: string): Promise<DrugReferenceResult> {
+export async function getDrugReference(name: string, language?: string): Promise<DrugReferenceResult> {
   const query = name.trim();
-  const queryKey = query.toLowerCase();
+  const lookup = query.toLowerCase();
+  // The condensed summary is written in the reader's language, so the cache is
+  // keyed by language too: one shared document would hand the next reader
+  // someone else's language and look like the switch had failed.
+  const queryKey = `${lookup}::${language ?? "en"}`;
 
   const hit = await DrugReference.findOne({ queryKey });
   if (hit && Date.now() - hit.fetchedAt.getTime() < CACHE_TTL_MS) {
     return toResult(hit, query, true);
   }
 
-  const [label, rxcui] = await Promise.all([lookupOpenFda(queryKey), lookupRxNorm(queryKey)]);
+  const [label, rxcui] = await Promise.all([lookupOpenFda(lookup), lookupRxNorm(lookup)]);
 
-  const sections: Array<{ heading: string; text: string }> = [];
+  const sections: DrugReferenceSection[] = [];
   const brandNames: string[] = [];
   let genericName: string | undefined;
 
@@ -232,7 +252,7 @@ export async function getDrugReference(name: string): Promise<DrugReferenceResul
 
     for (const field of LABEL_FIELDS) {
       const text = firstString(label[field.key]);
-      if (text) sections.push({ heading: field.heading, text: truncate(text) });
+      if (text) sections.push({ heading: field.heading, headingKey: `drug.section.${field.key}`, text: truncate(text) });
     }
   }
 
@@ -242,7 +262,7 @@ export async function getDrugReference(name: string): Promise<DrugReferenceResul
       name: "openFDA drug label (U.S. Food and Drug Administration)",
       url:
         "https://api.fda.gov/drug/label.json?search=openfda.generic_name:%22" +
-        encodeURIComponent(queryKey) +
+        encodeURIComponent(lookup) +
         "%22&limit=1",
     });
   }
@@ -256,8 +276,8 @@ export async function getDrugReference(name: string): Promise<DrugReferenceResul
   const found = sections.length > 0;
   // A near-miss is worth saying out loud: a combination product's label is not
   // the label for the single ingredient a doctor asked about.
-  const exactMatch = isExactMatch(genericName, queryKey);
-  const plainSummary = found ? await condense(query, sections) : null;
+  const exactMatch = isExactMatch(genericName, lookup);
+  const condensed = found ? await condense(query, sections, language) : null;
 
   const doc = await DrugReference.findOneAndUpdate(
     { queryKey },
@@ -270,7 +290,8 @@ export async function getDrugReference(name: string): Promise<DrugReferenceResul
         brandNames,
         sections,
         sources,
-        plainSummary: plainSummary ?? undefined,
+        plainSummary: condensed?.summary,
+        keyCautions: condensed?.keyCautions ?? [],
         exactMatch,
         fetchedAt: new Date(),
       },

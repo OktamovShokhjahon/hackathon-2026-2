@@ -4,11 +4,17 @@ import { ProvenanceChip } from "@/components/ui/provenance-chip";
 import { RiskBadge } from "@/components/ui/risk-badge";
 import { fieldLabel, fieldList } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
+import { signalExplanation, signalMonitoring, useClinicalText } from "@/lib/clinical-text";
 import { ORGAN_BY_KEY, organLabelKey } from "@/components/digital-twin/anatomy";
 import type { OrganSignal } from "@/components/digital-twin/types";
+import type { MessageKey } from "@/lib/locales/uz";
 
 export interface AnalysisNarrative {
   aiNarrative?: string;
+  /** The window the analysis covers, for restating a rule summary. */
+  horizonDays?: number;
+  /** Worst rule severity, as a level rather than a colour. */
+  overallRiskLevel?: "low" | "moderate" | "high";
   narrativeSource?: "model" | "rule_summary";
   aiAvailable?: boolean;
   aiError?: string;
@@ -26,10 +32,38 @@ export interface AnalysisNarrative {
  */
 export function AnalysisFindings({ analysis }: { analysis: AnalysisNarrative }) {
   const { t } = useI18n();
+  const text = useClinicalText();
 
   /** Registry name where there is one, the raw key spaced out where there is not. */
   const organLabel = (organ: string) =>
     ORGAN_BY_KEY[organ] ? t(organLabelKey(organ)) : organ.replace(/_/g, " ");
+
+  /**
+   * The rule summary, said again in this language.
+   *
+   * When the model is unreachable the API restates the rule result in
+   * sentences. Those sentences are English, but everything they restate is on
+   * this page already and already translated, so the summary is rebuilt here
+   * rather than printed as it arrived — otherwise the one paragraph a doctor
+   * reads when the AI is down is the one paragraph in the wrong language.
+   */
+  const ruleSummary = () => {
+    const organs = [...new Set(analysis.signals.map((signal) => organLabel(signal.organ)))];
+    const lines = [
+      organs.length > 0
+        ? t("scenario.ruleSummary.flagged", {
+            days: analysis.horizonDays ?? 0,
+            organs: organs.join(", "),
+            risk: t(`severity.${analysis.overallRiskLevel ?? "low"}` as MessageKey),
+          })
+        : t("scenario.ruleSummary.none", { days: analysis.horizonDays ?? 0 }),
+      ...new Set(analysis.signals.map((signal) => signalExplanation(text, signal))),
+    ];
+    if (analysis.missingData.length > 0) {
+      lines.push(t("scenario.ruleSummary.missing", { list: fieldList(analysis.missingData) }));
+    }
+    return lines.join(" ");
+  };
 
   // One rule can raise a signal per organ; the explanation is what varies.
   const findings = Array.from(
@@ -76,7 +110,7 @@ export function AnalysisFindings({ analysis }: { analysis: AnalysisNarrative }) 
               </div>
 
               <p className="mt-2 max-w-readable text-[13px] leading-relaxed text-ink-muted">
-                {signal.explanation}
+                {signalExplanation(text, signal)}
               </p>
 
               {signal.observed && signal.observed.length > 0 && (
@@ -99,9 +133,9 @@ export function AnalysisFindings({ analysis }: { analysis: AnalysisNarrative }) 
                 </p>
               )}
 
-              {signal.monitoring && (
+              {signalMonitoring(text, signal) && (
                 <p className="mt-2.5 border-l-2 pl-3 text-[12px] leading-relaxed text-ink-muted" style={{ borderColor: "var(--signal)" }}>
-                  {signal.monitoring}
+                  {signalMonitoring(text, signal)}
                 </p>
               )}
 
@@ -144,7 +178,9 @@ export function AnalysisFindings({ analysis }: { analysis: AnalysisNarrative }) 
               {analysis.aiAvailable ? analysis.modelId : t("af.noModelOutput")}
             </span>
           </div>
-          <p className="mt-2.5 max-w-readable text-[13px] leading-relaxed text-ink">{analysis.aiNarrative}</p>
+          <p className="mt-2.5 max-w-readable text-[13px] leading-relaxed text-ink">
+            {analysis.narrativeSource === "rule_summary" ? ruleSummary() : analysis.aiNarrative}
+          </p>
           {!analysis.aiAvailable && (
             <p className="mt-2 text-[12px] leading-relaxed text-ink-faint">
               {t("af.modelUnavailable")}

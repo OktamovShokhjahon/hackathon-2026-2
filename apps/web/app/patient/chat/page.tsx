@@ -17,7 +17,7 @@ interface Conversation {
 }
 
 export default function PatientChatPage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -41,6 +41,9 @@ export default function PatientChatPage() {
     try {
       const result = await api.post<{ conversation: Conversation }>(`/chat/conversations/${conversationId}/messages`, {
         message: userMessage,
+        // What to answer in when the message itself does not say — a one-word
+        // reply, a number, a name.
+        language: locale,
       });
       setMessages(result.conversation.messages);
     } finally {

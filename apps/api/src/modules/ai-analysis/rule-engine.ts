@@ -57,7 +57,14 @@ function evaluateRule(
   rule: RuleDefinition,
   snapshot: PatientSnapshot,
   allMedications: string[]
-): { severity: RiskColor; explanation: string; missingForRule: string[]; observed: OrganSignal["observed"] } | null {
+): {
+  severity: RiskColor;
+  explanation: string;
+  explanationKey: string;
+  explanationVars?: Record<string, string | number>;
+  missingForRule: string[];
+  observed: OrganSignal["observed"];
+} | null {
   const missingForRule = rule.requiredFields.filter((field) => snapshot.labValues[field] === undefined);
 
   const observed: OrganSignal["observed"] = [];
@@ -70,7 +77,7 @@ function evaluateRule(
 
   // Thresholds can read fields outside requiredFields (an ACE-inhibitor rule
   // reacts to eGFR when it happens to be on file) — record those too.
-  let worst: { severity: RiskColor; explanation: string } | null = null;
+  let worst: { severity: RiskColor; explanation: string; key: string; vars: Record<string, string | number> } | null = null;
   for (const check of rule.thresholds ?? []) {
     const value = snapshot.labValues[check.field];
     if (value === undefined) continue;
@@ -85,20 +92,30 @@ function evaluateRule(
     if (!crosses(value, check)) continue;
     const explanation = check.explanation.replace("{value}", String(value));
     if (!worst || COLOR_RANK[check.severity] > COLOR_RANK[worst.severity]) {
-      worst = { severity: check.severity, explanation };
+      // The key travels with the value it quotes, so the same sentence can be
+      // rebuilt in any language without re-running the rule.
+      worst = { severity: check.severity, explanation, key: `rule.${rule.code}.${check.key}`, vars: { value } };
     }
   }
 
   if (worst) {
     // A crossed threshold is the finding, but missing companion data still
     // counts as missing: the doctor is owed both facts.
-    return { severity: worst.severity, explanation: worst.explanation, missingForRule, observed };
+    return {
+      severity: worst.severity,
+      explanation: worst.explanation,
+      explanationKey: worst.key,
+      explanationVars: worst.vars,
+      missingForRule,
+      observed,
+    };
   }
 
   if (missingForRule.length > 0) {
     return {
       severity: rule.missingDataSeverity,
       explanation: rule.missingExplanation,
+      explanationKey: `rule.${rule.code}.missing`,
       missingForRule,
       observed,
     };
@@ -107,6 +124,7 @@ function evaluateRule(
   return {
     severity: rule.baselineSeverity,
     explanation: rule.satisfiedExplanation,
+    explanationKey: `rule.${rule.code}.satisfied`,
     missingForRule: [],
     observed,
   };
@@ -184,10 +202,13 @@ export function runClinicalRules(snapshot: PatientSnapshot): RuleEngineResult {
         severity: SEVERITY_TO_LEVEL[outcome.severity],
         color: outcome.severity,
         explanation: outcome.explanation,
+        explanationKey: outcome.explanationKey,
+        explanationVars: outcome.explanationVars,
         evidenceRecordIds: snapshot.evidenceRecordIds,
         missingData: outcome.missingForRule,
         observed: outcome.observed,
         monitoring: rule.monitoring,
+        monitoringKey: rule.monitoring ? `rule.${rule.code}.monitoring` : undefined,
         ruleCode: rule.code,
       });
     }

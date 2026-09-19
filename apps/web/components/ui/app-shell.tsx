@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAuthHydrated, useAuthStore, type Role } from "@/lib/auth-store";
@@ -233,34 +233,85 @@ export function AppShell({
 }
 
 /**
- * Mark: a lamp throwing two beams across a measured horizon. "Mayoq" is a
- * lighthouse — the product's whole job is to light the hazard before the ship
- * reaches it. The lamp is the only lit element; the structure around it stays
- * hairline, so the mark reads as an instrument rather than a badge.
+ * Mark: the MAYOQ lighthouse standing inside the M, its beams across the
+ * horizon and a helix running down the tower. "Mayoq" is a lighthouse — the
+ * product's whole job is to light the hazard before the ship reaches it, and
+ * the helix is the patient it lights the way for.
+ *
+ * Drawn inline rather than pulled from /logo.svg so the mark can follow the
+ * surface it sits on: on the navy rail the letterform lifts to near-white,
+ * while the lamp keeps its gold everywhere.
  */
 export function Mark({ className = "h-5 w-5", onNavy = false }: { className?: string; onNavy?: boolean }) {
-  const structure = onNavy ? "rgba(255,255,255,0.4)" : "var(--line-strong)";
-  const horizon = onNavy ? "rgba(255,255,255,0.75)" : "var(--ink-muted)";
+  // Gradient ids are document-scoped and the shell paints the mark more than
+  // once per page (header and footer), so each instance needs its own.
+  const uid = useId().replace(/:/g, "");
+  const url = (name: string) => "url(#" + name + "-" + uid + ")";
+  const id = (name: string) => name + "-" + uid;
+  const letterTop = onNavy ? "#EAF1FF" : "#20499C";
+  const letterBottom = onNavy ? "#A6C2F2" : "#15306B";
+  // The pale helix strand reads as the gap between the gold rungs, so on navy
+  // it has to go dark rather than stay white.
+  const strandPale = onNavy ? "#0B1419" : "#F3F7FF";
+
   return (
-    <svg viewBox="0 0 24 24" aria-hidden className={className} fill="none">
+    <svg viewBox="0 0 64 64" aria-hidden className={className} fill="none">
+      <defs>
+        <linearGradient id={id("mqNavy")} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor={letterTop} />
+          <stop offset="1" stopColor={letterBottom} />
+        </linearGradient>
+        <linearGradient id={id("mqGold")} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#FFE07A" />
+          <stop offset="0.5" stopColor="#FFC81F" />
+          <stop offset="1" stopColor="#F2A900" />
+        </linearGradient>
+        <linearGradient id={id("mqBeamL")} x1="1" y1="0" x2="0" y2="0">
+          <stop offset="0" stopColor="#FFC81F" stopOpacity="0.95" />
+          <stop offset="1" stopColor="#FFE9A8" stopOpacity="0" />
+        </linearGradient>
+        <linearGradient id={id("mqBeamR")} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#FFC81F" stopOpacity="0.95" />
+          <stop offset="1" stopColor="#FFE9A8" stopOpacity="0" />
+        </linearGradient>
+        <radialGradient id={id("mqGlow")}>
+          <stop offset="0" stopColor="#FFFFFF" />
+          <stop offset="0.45" stopColor="#FFE07A" />
+          <stop offset="1" stopColor="#FFC81F" stopOpacity="0" />
+        </radialGradient>
+        <clipPath id={id("mqTower")}>
+          <path d="M28.4 15h7.2l1.6 29.6L32 56l-5.2-11.4z" />
+        </clipPath>
+      </defs>
+
       {/* The beams, widening as they leave the lens. */}
-      <path
-        d="M10.1 7.2 3 4.4M10.1 10.4 3 11.6M13.9 7.2 21 4.4M13.9 10.4 21 11.6"
-        stroke="var(--lamp)"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-        opacity="0.55"
-      />
-      {/* The lamp itself. */}
-      <circle cx="12" cy="8.8" r="2.5" fill="var(--lamp)" />
-      {/* Tower: two rakes down to a measured base. */}
-      <path
-        d="M10.2 11.6 9 19.4M13.8 11.6 15 19.4"
-        stroke={structure}
-        strokeWidth="1.4"
-        strokeLinecap="round"
-      />
-      <path d="M7.6 19.4h8.8" stroke={horizon} strokeWidth="1.6" strokeLinecap="round" />
+      <path d="M28.8 6.2 0.8 0.4 0.2 8.6 28.8 11.8z" fill={url("mqBeamL")} />
+      <path d="M35.2 6.2 63.2 0.4 63.8 8.6 35.2 11.8z" fill={url("mqBeamR")} />
+
+      {/* The letterform. */}
+      <g fill={url("mqNavy")}>
+        <path d="M6 56V18h11l15 30v8h-5L16 35v21z" />
+        <path d="M58 56V18H47L32 48v8h5l11-21v21z" />
+      </g>
+
+      {/* The tower, with the helix running down inside it. */}
+      <path d="M28.4 15h7.2l1.6 29.6L32 56l-5.2-11.4z" fill={url("mqNavy")} />
+      <g clipPath={"url(#" + id("mqTower") + ")"} fill="none" strokeLinecap="round">
+        <path d="M32 16c5 4 5 8 0 12s-5 8 0 12 5 8 0 12" stroke={url("mqGold")} strokeWidth="1.9" />
+        <path d="M32 16c-5 4-5 8 0 12s5 8 0 12-5 8 0 12" stroke={strandPale} strokeWidth="1.9" />
+        <path
+          d="M29.6 19h4.8M28.6 22h6.8M29.6 25h4.8M29.6 31h4.8M28.6 34h6.8M29.6 37h4.8M29.6 43h4.8M28.6 46h6.8M30.2 49h3.6"
+          stroke={url("mqGold")}
+          strokeWidth="1.5"
+        />
+      </g>
+
+      {/* Gallery, lantern room and roof. */}
+      <rect x="26.2" y="12.6" width="11.6" height="2.8" rx="1.1" fill={url("mqNavy")} />
+      <rect x="27.8" y="5.6" width="8.4" height="7.2" rx="1.2" fill={url("mqGold")} />
+      <circle cx="32" cy="9.2" r="4.6" fill={url("mqGlow")} />
+      <path d="M24.6 5.6 32 1.2l7.4 4.4z" fill={url("mqNavy")} />
+      <circle cx="32" cy="0.9" r="0.9" fill={url("mqNavy")} />
     </svg>
   );
 }
