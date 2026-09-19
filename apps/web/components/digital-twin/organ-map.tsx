@@ -1,7 +1,16 @@
 "use client";
 
-import { ORGAN_BY_KEY, STATE_GLYPH, STATE_HEX, STATE_LABEL } from "./anatomy";
+import {
+  ORGAN_BY_KEY,
+  STATE_GLYPH,
+  STATE_HEX,
+  STATE_LABEL_KEY,
+  organLabelKey,
+  systemLabelKey,
+} from "./anatomy";
 import { ProvenanceChip } from "@/components/ui/provenance-chip";
+import { useI18n } from "@/lib/i18n";
+import type { MessageKey } from "@/lib/locales/uz";
 import type { OrganSignal } from "./types";
 
 /**
@@ -21,13 +30,10 @@ export function OrganMap({
   selectedOrgan?: string | null;
   onSelectOrgan?: (key: string | null) => void;
 }) {
+  const { t } = useI18n();
+
   if (signals.length === 0) {
-    return (
-      <p className="text-sm text-ink-faint">
-        No organ-level signals for this scenario. Nothing here means &ldquo;not assessed&rdquo;, not
-        &ldquo;no risk&rdquo;.
-      </p>
-    );
+    return <p className="text-sm text-ink-faint">{t("twin.noSignals")}</p>;
   }
 
   // Problems first: a doctor should not have to hunt for the red row.
@@ -62,27 +68,26 @@ export function OrganMap({
                   {STATE_GLYPH[signal.color]}
                 </span>
                 <span className="min-w-0 flex-1 truncate font-display text-[14px] text-ink">
-                  {organ?.label ?? signal.organ}
+                  {organ ? t(organLabelKey(organ.key)) : signal.organ}
                 </span>
                 <span
                   className="shrink-0 font-mono text-[9px] uppercase tracking-[0.1em]"
                   style={{ color: STATE_HEX[signal.color] }}
                 >
-                  {signal.severity}
+                  {t(`severity.${signal.severity}` as MessageKey)}
                 </span>
               </div>
 
               {!active && signal.missingData.length > 0 && (
                 <p className="mt-1 pl-[26px] font-mono text-[9px] uppercase tracking-[0.1em] text-state-amber">
-                  {signal.missingData.length} field
-                  {signal.missingData.length > 1 ? "s" : ""} missing
+                  {t("twin.missingCount", { count: signal.missingData.length })}
                 </p>
               )}
 
               {active && (
                 <div className="mt-2 pl-[26px]">
                   <p className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-faint">
-                    {organ?.system} · {STATE_LABEL[signal.color]}
+                    {organ ? t(systemLabelKey(organ.system)) : ""} · {t(STATE_LABEL_KEY[signal.color])}
                   </p>
                   <p className="mt-1.5 text-[13px] leading-relaxed text-ink-muted">
                     {signal.explanation}
@@ -92,7 +97,7 @@ export function OrganMap({
                   </div>
                   {signal.missingData.length > 0 && (
                     <p className="mt-2 font-mono text-[9px] uppercase tracking-[0.1em] text-state-amber">
-                      Missing: {signal.missingData.join(" · ")}
+                      {t("twin.missingPrefix")} {signal.missingData.join(" · ")}
                     </p>
                   )}
                 </div>

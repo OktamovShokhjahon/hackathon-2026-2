@@ -8,6 +8,7 @@ import { Field, Modal, inputClass } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { api, ApiError } from "@/lib/api-client";
 import { humanizeEnum } from "@/lib/format";
+import { useI18n } from "@/lib/i18n";
 
 interface Doctor {
   _id: string;
@@ -22,6 +23,7 @@ const EMPTY = { fullName: "", email: "", phone: "", password: "" };
 export default function AdminDoctorsPage() {
   const queryClient = useQueryClient();
   const toast = useToast();
+  const { t } = useI18n();
   const [tempPasswordFor, setTempPasswordFor] = useState<{ name: string; password: string } | null>(null);
   const { data: doctors, isLoading } = useQuery({
     queryKey: ["doctors"],
@@ -43,7 +45,7 @@ export default function AdminDoctorsPage() {
       queryClient.invalidateQueries({ queryKey: ["doctors"] });
     },
     onError: (err) =>
-      setError(err instanceof ApiError ? err.message : "Could not create the doctor"),
+      setError(err instanceof ApiError ? err.message : t("adr.createFailed")),
   });
 
   const resetPassword = useMutation({
@@ -58,7 +60,7 @@ export default function AdminDoctorsPage() {
       queryClient.invalidateQueries({ queryKey: ["doctors"] });
     },
     onError: (err) =>
-      setError(err instanceof ApiError ? err.message : "The password could not be reset"),
+      setError(err instanceof ApiError ? err.message : t("adr.resetFailed")),
   });
 
   const toggleStatus = useMutation({
@@ -75,9 +77,9 @@ export default function AdminDoctorsPage() {
   return (
     <AppShell role="ADMIN" navItems={ADMIN_NAV}>
       <PageHeader
-        eyebrow="Clinic console"
-        title="Doctors"
-        description="Accounts that can open patient charts in this clinic. You set the first password and hand it over yourself."
+        eyebrow={t("ad.eyebrow")}
+        title={t("adr.title")}
+        description={t("adr.description")}
         action={
           <button
             onClick={() => {
@@ -86,7 +88,7 @@ export default function AdminDoctorsPage() {
             }}
             className="rounded bg-electric px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-electric/90 hover:shadow-md"
           >
-            Add doctor
+            {t("adr.addDoctor")}
           </button>
         }
       />
@@ -97,8 +99,7 @@ export default function AdminDoctorsPage() {
           className="mb-4 rounded border border-state-amber/40 bg-state-amber/10 px-4 py-3"
         >
           <p className="text-sm text-state-amber">
-            Temporary password for {tempPasswordFor.name}. It is shown once — their existing
-            sessions have been signed out.
+            {t("adr.tempPasswordFor", { name: tempPasswordFor.name })}
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <code className="rounded bg-surface px-2.5 py-1 font-mono text-[13px] text-ink">
@@ -107,17 +108,17 @@ export default function AdminDoctorsPage() {
             <button
               onClick={() => {
                 navigator.clipboard?.writeText(tempPasswordFor.password);
-                toast("Temporary password copied");
+                toast(t("adr.copied"));
               }}
               className="font-mono text-[11px] uppercase tracking-[0.1em] text-signal hover:underline"
             >
-              Copy
+              {t("adr.copy")}
             </button>
             <button
               onClick={() => setTempPasswordFor(null)}
               className="font-mono text-[11px] uppercase tracking-[0.1em] text-ink-faint hover:text-ink"
             >
-              Dismiss
+              {t("adr.dismiss")}
             </button>
           </div>
         </div>
@@ -128,11 +129,11 @@ export default function AdminDoctorsPage() {
           role="status"
           className="mb-4 rounded border border-state-green/40 bg-state-green/10 px-4 py-2.5 text-sm text-state-green"
         >
-          {created} can now sign in with the email and password you set.
+          {t("adr.created", { name: created })}
         </p>
       )}
 
-      <Panel title={`Doctors${doctors ? ` · ${doctors.length}` : ""}`}>
+      <Panel title={`${t("adr.doctors")}${doctors ? ` · ${doctors.length}` : ""}`}>
         {isLoading ? (
           <Skeleton rows={4} />
         ) : doctors && doctors.length > 0 ? (
@@ -168,7 +169,7 @@ export default function AdminDoctorsPage() {
                     disabled={resetPassword.isPending}
                     className="rounded border border-[color:var(--line)] px-3 py-1.5 text-sm text-ink transition hover:bg-ink/[0.04] disabled:opacity-60"
                   >
-                    Reset password
+                    {t("adr.resetPassword")}
                   </button>
                   <button
                     onClick={() =>
@@ -179,7 +180,7 @@ export default function AdminDoctorsPage() {
                     }
                     className="rounded border border-[color:var(--line)] px-3 py-1.5 text-sm text-ink transition hover:bg-ink/[0.04]"
                   >
-                    {doctor.status === "active" ? "Deactivate" : "Activate"}
+                    {doctor.status === "active" ? t("adr.deactivate") : t("adr.activate")}
                   </button>
                 </div>
               </li>
@@ -187,8 +188,8 @@ export default function AdminDoctorsPage() {
           </ul>
         ) : (
           <EmptyState
-            title="No doctors yet"
-            body="Add the first doctor account so they can start building patient charts."
+            title={t("adr.none")}
+            body={t("adr.noneBody")}
           />
         )}
       </Panel>
@@ -196,8 +197,8 @@ export default function AdminDoctorsPage() {
       <Modal
         open={open}
         onClose={close}
-        title="Add a doctor"
-        description="You choose the password and share it with them directly. It is stored hashed and never shown again."
+        title={t("adr.modalTitle")}
+        description={t("adr.modalDescription")}
         footer={
           <>
             <button
@@ -205,7 +206,7 @@ export default function AdminDoctorsPage() {
               onClick={close}
               className="rounded border border-[color:var(--line)] px-4 py-2 text-sm text-ink transition hover:bg-ink/[0.04]"
             >
-              Cancel
+              {t("common.cancel")}
             </button>
             <button
               type="submit"
@@ -213,7 +214,7 @@ export default function AdminDoctorsPage() {
               disabled={createDoctor.isPending}
               className="rounded bg-electric px-4 py-2 text-sm font-medium text-white transition hover:bg-electric/90 disabled:opacity-60"
             >
-              {createDoctor.isPending ? "Creating…" : "Create doctor"}
+              {createDoctor.isPending ? t("common.creating") : t("adr.create")}
             </button>
           </>
         }
@@ -226,7 +227,7 @@ export default function AdminDoctorsPage() {
           }}
           className="flex flex-col gap-4"
         >
-          <Field label="Full name">
+          <Field label={t("common.fullName")}>
             <input
               required
               minLength={2}
@@ -236,7 +237,7 @@ export default function AdminDoctorsPage() {
             />
           </Field>
 
-          <Field label="Email">
+          <Field label={t("common.email")}>
             <input
               type="email"
               required
@@ -246,7 +247,7 @@ export default function AdminDoctorsPage() {
             />
           </Field>
 
-          <Field label="Phone number">
+          <Field label={t("common.phone")}>
             <input
               type="tel"
               required
@@ -257,7 +258,7 @@ export default function AdminDoctorsPage() {
             />
           </Field>
 
-          <Field label="Password" hint="At least 10 characters. Share it with the doctor securely.">
+          <Field label={t("common.password")} hint={t("adr.passwordHint")}>
             <input
               type="text"
               required

@@ -9,6 +9,7 @@ import { EmptyState, PageHeader, Panel, Skeleton } from "@/components/ui/console
 import { Field, Modal, inputClass } from "@/components/ui/modal";
 import { api, ApiError } from "@/lib/api-client";
 import { humanizeEnum } from "@/lib/format";
+import { useI18n } from "@/lib/i18n";
 
 interface PatientRow {
   _id: string;
@@ -32,6 +33,7 @@ const STATUS_COLOR: Record<string, string> = {
 export default function DoctorPatientsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { t } = useI18n();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<(typeof STATUSES)[number]>("ALL");
   const { data, isLoading } = useQuery({
@@ -63,7 +65,7 @@ export default function DoctorPatientsPage() {
       router.push(`/doctor/patients/${res.patient.id}`);
     },
     onError: (err) =>
-      setError(err instanceof ApiError ? err.message : "Could not create the patient"),
+      setError(err instanceof ApiError ? err.message : t("dp.createFailed")),
   });
 
   function close() {
@@ -74,28 +76,28 @@ export default function DoctorPatientsPage() {
   return (
     <AppShell role="DOCTOR" navItems={DOCTOR_NAV}>
       <PageHeader
-        eyebrow="Doctor console"
-        title="Patients"
-        description="Everyone on your panel. Open a chart to add history, run an analysis, or read the twin."
+        eyebrow={t("dd.eyebrow")}
+        title={t("dp.title")}
+        description={t("dp.description")}
         action={
           <button
             onClick={() => setOpen(true)}
             className="rounded bg-electric px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-electric/90 hover:shadow-md"
           >
-            New patient
+            {t("dd.newPatient")}
           </button>
         }
       />
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <input
-          placeholder="Search by name, code or phone"
+          placeholder={t("dp.searchPlaceholder")}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          aria-label="Search patients"
+          aria-label={t("dp.searchLabel")}
           className={`${inputClass} max-w-sm`}
         />
-        <div className="flex flex-wrap gap-1" role="group" aria-label="Filter by status">
+        <div className="flex flex-wrap gap-1" role="group" aria-label={t("filter.byStatus")}>
           {STATUSES.map((option) => (
             <button
               key={option}
@@ -107,13 +109,13 @@ export default function DoctorPatientsPage() {
                   : "border-[color:var(--line)] text-ink-faint hover:text-ink"
               }`}
             >
-              {option === "ALL" ? "All" : humanizeEnum(option)}
+              {option === "ALL" ? t("filter.all") : humanizeEnum(option)}
             </button>
           ))}
         </div>
       </div>
 
-      <Panel title={`Panel${data ? ` · ${data.length}` : ""}`}>
+      <Panel title={`${t("dp.panel")}${data ? ` · ${data.length}` : ""}`}>
         {isLoading ? (
           <Skeleton rows={5} />
         ) : data && data.length > 0 ? (
@@ -126,7 +128,7 @@ export default function DoctorPatientsPage() {
                 >
                   <div className="min-w-0">
                     <p className="truncate text-[14px] text-ink">
-                      {patient.user?.fullName ?? "Unnamed patient"}
+                      {patient.user?.fullName ?? t("common.unnamedPatient")}
                     </p>
                     <p className="mt-0.5 font-mono text-[11px] text-ink-faint">
                       {patient.patientCode}
@@ -146,12 +148,12 @@ export default function DoctorPatientsPage() {
         ) : (
           <EmptyState
             title={
-              search || status !== "ALL" ? "No patients match these filters" : "No patients yet"
+              search || status !== "ALL" ? t("dp.noMatch") : t("dp.none")
             }
             body={
               search || status !== "ALL"
-                ? "Try a different name, patient code or phone number, or clear the status filter."
-                : "Create the first patient to start building a chart."
+                ? t("dp.noMatchBody")
+                : t("dp.noneBody")
             }
             action={
               search || status !== "ALL" ? (
@@ -162,7 +164,7 @@ export default function DoctorPatientsPage() {
                   }}
                   className="mt-1 font-mono text-[11px] uppercase tracking-[0.12em] text-signal hover:underline"
                 >
-                  Clear filters
+                  {t("dp.clearFilters")}
                 </button>
               ) : undefined
             }
@@ -173,8 +175,8 @@ export default function DoctorPatientsPage() {
       <Modal
         open={open}
         onClose={close}
-        title="New patient"
-        description="Name, contact details and a password are enough to start. Everything clinical is added afterwards."
+        title={t("dp.newPatientTitle")}
+        description={t("dp.newPatientDescription")}
         footer={
           <>
             <button
@@ -182,7 +184,7 @@ export default function DoctorPatientsPage() {
               onClick={close}
               className="rounded border border-[color:var(--line)] px-4 py-2 text-sm text-ink transition hover:bg-ink/[0.04]"
             >
-              Cancel
+              {t("common.cancel")}
             </button>
             <button
               type="submit"
@@ -190,7 +192,7 @@ export default function DoctorPatientsPage() {
               disabled={createPatient.isPending}
               className="rounded bg-electric px-4 py-2 text-sm font-medium text-white transition hover:bg-electric/90 disabled:opacity-60"
             >
-              {createPatient.isPending ? "Creating…" : "Create patient"}
+              {createPatient.isPending ? t("common.creating") : t("dp.create")}
             </button>
           </>
         }
@@ -203,7 +205,7 @@ export default function DoctorPatientsPage() {
           }}
           className="flex flex-col gap-4"
         >
-          <Field label="Full name">
+          <Field label={t("common.fullName")}>
             <input
               required
               minLength={2}
@@ -213,7 +215,7 @@ export default function DoctorPatientsPage() {
             />
           </Field>
 
-          <Field label="Phone number">
+          <Field label={t("common.phone")}>
             <input
               type="tel"
               required
@@ -224,7 +226,7 @@ export default function DoctorPatientsPage() {
             />
           </Field>
 
-          <Field label="Email">
+          <Field label={t("common.email")}>
             <input
               type="email"
               required
@@ -235,8 +237,8 @@ export default function DoctorPatientsPage() {
           </Field>
 
           <Field
-            label="Password"
-            hint="At least 10 characters. Give it to the patient securely — it is stored hashed and never shown again."
+            label={t("common.password")}
+            hint={t("dp.passwordHint")}
           >
             <input
               type="text"

@@ -7,6 +7,8 @@ import { RiskBadge } from "@/components/ui/risk-badge";
 import { EmptyState, MetaItem, PageHeader, Panel, Row, Skeleton } from "@/components/ui/console";
 import { api } from "@/lib/api-client";
 import type { RiskColor } from "@/components/digital-twin/types";
+import { useI18n } from "@/lib/i18n";
+import { formatDateTime, humanizeEnum } from "@/lib/format";
 
 interface Scenario {
   _id: string;
@@ -19,6 +21,7 @@ interface Scenario {
 }
 
 export default function DoctorAlertsPage() {
+  const { t } = useI18n();
   const { data, isLoading, isError } = useQuery({
     queryKey: ["doctor-dashboard-analyses"],
     queryFn: () => api.get<{ recentAnalyses: Scenario[] }>("/doctor/dashboard"),
@@ -41,31 +44,31 @@ export default function DoctorAlertsPage() {
   return (
     <AppShell role="DOCTOR" navItems={DOCTOR_NAV}>
       <PageHeader
-        eyebrow="Alerts"
-        title="Analyses waiting on a decision"
-        description="Every alert here needs a doctor to review it and record what they decided. Nothing resolves on its own."
+        eyebrow={t("da.eyebrow")}
+        title={t("da.title")}
+        description={t("da.description")}
         meta={
           data && (
             <>
-              <MetaItem label="High priority" value={String(high)} />
-              <MetaItem label="Total open" value={String(alerts.length)} />
+              <MetaItem label={t("da.highPriority")} value={String(high)} />
+              <MetaItem label={t("da.totalOpen")} value={String(alerts.length)} />
             </>
           )
         }
       />
 
-      <Panel title="Open alerts">
+      <Panel title={t("da.openAlerts")}>
         {isError ? (
           <EmptyState
-            title="Alerts could not load"
-            body="Check your connection and reload. No patient data has changed."
+            title={t("da.loadFailed")}
+            body={t("da.loadFailedBody")}
           />
         ) : isLoading ? (
           <Skeleton rows={4} />
         ) : alerts.length === 0 ? (
           <EmptyState
-            title="Nothing open"
-            body="No analysis is currently flagged for review. New alerts appear here as soon as an analysis returns an amber or red signal."
+            title={t("da.nothingOpen")}
+            body={t("da.nothingOpenBody")}
           />
         ) : (
           <div className="-mx-2 flex flex-col divide-y divide-[color:var(--line)]">
@@ -73,8 +76,8 @@ export default function DoctorAlertsPage() {
               <Row
                 key={alert._id}
                 href={`/doctor/patients/${alert.patientId}`}
-                primary={alert.patientName ?? alert.patientCode ?? "Unnamed patient"}
-                secondary={`${new Date(alert.createdAt).toLocaleString()} · ${alert.status}`}
+                primary={alert.patientName ?? alert.patientCode ?? t("common.unnamedPatient")}
+                secondary={`${formatDateTime(alert.createdAt)} · ${humanizeEnum(alert.status)}`}
                 trailing={<RiskBadge color={alert.overallRisk} quiet />}
               />
             ))}

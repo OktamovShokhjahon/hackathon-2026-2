@@ -1,15 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { BodyDiagram } from "./body-diagram";
 import { DEMO_AFTER, DEMO_BEFORE, DEMO_PATIENT, DEMO_TIMELINE } from "./demo-scenario";
-import { ORGAN_BY_KEY } from "./anatomy";
+import { ORGAN_BY_KEY, organLabelKey } from "./anatomy";
 import { OrganLabels, type Projection } from "./organ-labels";
 import { ZoomControls } from "./zoom-controls";
 import type { ZoomApi } from "./body-scene";
 import { usePrefersReducedMotion } from "@/lib/use-reduced-motion";
 import { useI18n } from "@/lib/i18n";
+import type { MessageKey } from "@/lib/locales/uz";
 
 const BodyScene = dynamic(() => import("./body-scene").then((m) => m.BodyScene), {
   ssr: false,
@@ -102,9 +103,23 @@ export function HeroTwin() {
   const stopLabel = (day: number) =>
     day === 0 ? t("twin.today") : t("twin.dayN", { n: day });
 
+  // The demo scenario stores message keys rather than prose, so it is
+  // translated here, once, before anything downstream renders it.
+  const localise = useCallback(
+    (list: typeof DEMO_BEFORE) =>
+      list.map((signal) => ({
+        ...signal,
+        explanation: t(signal.explanation as MessageKey),
+        missingData: signal.missingData.map((field) => t(field as MessageKey)),
+      })),
+    [t],
+  );
+  const beforeSignals = useMemo(() => localise(DEMO_BEFORE), [localise]);
+  const afterSignals = useMemo(() => localise(DEMO_AFTER), [localise]);
+
   const pinnedStop = DEMO_TIMELINE.find((s) => s.day === pinnedDay);
   const activeStop = pinnedStop ?? stopNearest(mix);
-  const signals = mix > 0.5 ? DEMO_AFTER : DEMO_BEFORE;
+  const signals = mix > 0.5 ? afterSignals : beforeSignals;
   const active = selected ? signals.find((signal) => signal.organ === selected) : null;
 
   const onTimelineKey = useCallback((event: React.KeyboardEvent) => {
@@ -132,8 +147,8 @@ export function HeroTwin() {
           <div className="h-full w-full animate-pulse bg-ink/[0.035]" />
         ) : supported ? (
           <BodyScene
-            beforeSignals={DEMO_BEFORE}
-            afterSignals={DEMO_AFTER}
+            beforeSignals={beforeSignals}
+            afterSignals={afterSignals}
             mix={mix}
             view="front"
             sex="male"
@@ -163,7 +178,7 @@ export function HeroTwin() {
 
       {/* Instrument chrome */}
       <div className="pointer-events-none absolute left-4 top-4 flex flex-col gap-1">
-        <span className="readout">{DEMO_PATIENT.code} · synthetic</span>
+        <span className="readout">{DEMO_PATIENT.code} · {t("demo.synthetic")}</span>
         <span className="font-mono text-[11px] tracking-[0.1em]" style={{ color: "var(--cyan)" }}>
           {activeStop.day === 0 ? t("twin.current") : t("twin.projected")} · {t("twin.day")}{" "}
           {activeStop.day}
@@ -187,7 +202,7 @@ export function HeroTwin() {
           style={{ borderColor: "var(--line-strong)" }}
         >
           <div className="font-display text-sm text-ink">
-            {ORGAN_BY_KEY[active.organ]?.label ?? active.organ}
+            {ORGAN_BY_KEY[active.organ] ? t(organLabelKey(active.organ)) : active.organ}
           </div>
           <p className="mt-1 text-xs leading-relaxed text-ink-muted">{active.explanation}</p>
         </div>
@@ -237,7 +252,7 @@ export function HeroTwin() {
                 type="button"
                 onClick={() => setPinnedDay(stop.day)}
                 aria-pressed={current}
-                aria-label={`${stopLabel(stop.day)}: ${stop.note}`}
+                aria-label={`${stopLabel(stop.day)}: ${t(stop.note)}`}
                 className="relative z-10 flex flex-col items-center gap-2 px-1"
               >
                 <span
@@ -263,7 +278,7 @@ export function HeroTwin() {
           className="mt-2.5 min-h-[32px] max-w-xl text-[12px] leading-relaxed"
           style={{ color: "#b6c6d6" }}
         >
-          {activeStop.note}
+          {t(activeStop.note)}
         </p>
       </div>
     </div>

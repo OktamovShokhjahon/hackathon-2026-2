@@ -7,6 +7,7 @@ import { EmptyState, MetaItem, PageHeader, Panel, Skeleton } from "@/components/
 import { inputClass } from "@/components/ui/modal";
 import { api } from "@/lib/api-client";
 import { formatDate, humanizeEnum, initials } from "@/lib/format";
+import { useI18n } from "@/lib/i18n";
 
 interface PatientRow {
   _id: string;
@@ -27,6 +28,7 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 export default function AdminPatientsPage() {
+  const { t } = useI18n();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<(typeof STATUSES)[number]>("ALL");
 
@@ -49,14 +51,14 @@ export default function AdminPatientsPage() {
   return (
     <AppShell role="ADMIN" navItems={ADMIN_NAV}>
       <PageHeader
-        eyebrow="Clinic console"
-        title="Patients"
-        description="Who is registered at this clinic, and in what state. Clinical records stay with the treating doctor — nothing on this page opens a chart."
+        eyebrow={t("ad.eyebrow")}
+        title={t("ap.title")}
+        description={t("ap.description")}
         meta={
           data && (
             <>
-              <MetaItem label="Registered" value={String(data.length)} />
-              <MetaItem label="Shown" value={String(rows.length)} />
+              <MetaItem label={t("ap.registered")} value={String(data.length)} />
+              <MetaItem label={t("ap.shown")} value={String(rows.length)} />
             </>
           )
         }
@@ -66,11 +68,11 @@ export default function AdminPatientsPage() {
         <input
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search by name, code or email"
-          aria-label="Search patients"
+          placeholder={t("ap.searchPlaceholder")}
+          aria-label={t("dp.searchLabel")}
           className={`${inputClass} max-w-sm`}
         />
-        <div className="flex flex-wrap gap-1" role="group" aria-label="Filter by status">
+        <div className="flex flex-wrap gap-1" role="group" aria-label={t("filter.byStatus")}>
           {STATUSES.map((option) => (
             <button
               key={option}
@@ -82,22 +84,22 @@ export default function AdminPatientsPage() {
                   : "border-[color:var(--line)] text-ink-faint hover:text-ink"
               }`}
             >
-              {option === "ALL" ? "All" : humanizeEnum(option)}
+              {option === "ALL" ? t("filter.all") : humanizeEnum(option)}
             </button>
           ))}
         </div>
       </div>
 
-      <Panel title={`Patients · ${rows.length}`}>
+      <Panel title={`${t("ap.patients")} · ${rows.length}`}>
         {isLoading ? (
           <Skeleton rows={5} />
         ) : rows.length === 0 ? (
           <EmptyState
-            title={data && data.length > 0 ? "Nothing matches that filter" : "No patients yet"}
+            title={data && data.length > 0 ? t("ap.noMatch") : t("ap.none")}
             body={
               data && data.length > 0
-                ? "Clear the search or choose a different status."
-                : "Doctors create patients from their own console."
+                ? t("ap.noMatchBody")
+                : t("ap.noneBody")
             }
           />
         ) : (
@@ -114,10 +116,10 @@ export default function AdminPatientsPage() {
                   </span>
                   <div className="min-w-0">
                     <p className="truncate text-[14px] text-ink">
-                      {patient.user?.fullName ?? "Unnamed patient"}
+                      {patient.user?.fullName ?? t("common.unnamedPatient")}
                     </p>
                     <p className="mt-0.5 font-mono text-[11px] text-ink-faint">
-                      {patient.patientCode} · registered {formatDate(patient.createdAt)}
+                      {patient.patientCode} · {t("ap.registeredOn", { date: formatDate(patient.createdAt) })}
                     </p>
                   </div>
                 </div>

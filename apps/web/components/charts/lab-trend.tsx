@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { fieldLabel, formatDate } from "@/lib/format";
+import { useI18n } from "@/lib/i18n";
 
 export interface LabRecord {
   _id: string;
@@ -17,6 +18,7 @@ export interface LabRecord {
  * never have to work out which points actually happened.
  */
 export function LabTrend({ records }: { records: LabRecord[] }) {
+  const { t } = useI18n();
   const series = useMemo(() => {
     const byField = new Map<string, Array<{ date: string; value: number; unit?: string }>>();
     for (const record of records) {
@@ -47,7 +49,7 @@ export function LabTrend({ records }: { records: LabRecord[] }) {
   if (series.length === 0) {
     return (
       <p className="text-[13px] leading-relaxed text-ink-muted">
-        No measured values yet. Results your doctor records will be charted here.
+        {t("chart.noMeasured")}
       </p>
     );
   }
@@ -55,7 +57,7 @@ export function LabTrend({ records }: { records: LabRecord[] }) {
   return (
     <div>
       {series.length > 1 && (
-        <div className="mb-3 flex flex-wrap gap-1" role="group" aria-label="Choose a measurement">
+        <div className="mb-3 flex flex-wrap gap-1" role="group" aria-label={t("chart.chooseMeasurement")}>
           {series.map((entry, index) => (
             <button
               key={entry.field}
@@ -77,10 +79,14 @@ export function LabTrend({ records }: { records: LabRecord[] }) {
         <div className="flex items-baseline gap-3">
           <span className="font-mono text-[28px] tabular-nums text-ink">{selected.points[0].value}</span>
           <span className="text-[13px] text-ink-muted">
-            {selected.unit} · {fieldLabel(selected.field)} on {selected.points[0].label}
+            {selected.unit} ·{" "}
+            {t("chart.onDate", {
+              field: fieldLabel(selected.field),
+              date: selected.points[0].label,
+            })}
           </span>
           <span className="text-[12px] text-ink-faint">
-            One measurement so far — a line needs at least two.
+            {t("chart.oneMeasurement")}
           </span>
         </div>
       ) : (
@@ -123,8 +129,7 @@ export function LabTrend({ records }: { records: LabRecord[] }) {
       )}
 
       <p className="mt-3 text-[12px] leading-relaxed text-ink-faint">
-        Measured values only. Nothing here is projected, and a single reading is not a trend — your
-        doctor interprets these.
+        {t("chart.measuredOnly")}
       </p>
     </div>
   );

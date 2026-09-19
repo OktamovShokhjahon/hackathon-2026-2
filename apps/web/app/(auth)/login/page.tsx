@@ -9,6 +9,7 @@ import { useAuthStore } from "@/lib/auth-store";
 import { Mark } from "@/components/ui/app-shell";
 import { LanguageSwitcher } from "@/components/ui/language-switcher";
 import { useI18n } from "@/lib/i18n";
+import type { MessageKey } from "@/lib/locales/uz";
 
 interface LoginResponse {
   accessToken: string;
@@ -27,12 +28,12 @@ const ROLE_HOME: Record<string, string> = {
  * these credentials belong to synthetic patients created by `npm run seed`, and
  * a deployed instance must never offer to fill anything in.
  */
-const DEMO_ACCOUNTS = [
-  { role: "Clinic admin", email: "admin@twinrx.example", password: "DemoAdminPass123!" },
-  { role: "Doctor", email: "doctor@twinrx.example", password: "DemoDoctorPass123!" },
+const DEMO_ACCOUNTS: Array<{ role: MessageKey; email: string; password: string }> = [
+  { role: "role.admin", email: "admin@twinrx.example", password: "DemoAdminPass123!" },
+  { role: "role.doctor", email: "doctor@twinrx.example", password: "DemoDoctorPass123!" },
   // Patient Beta is the seeded account with a published scenario, so the
   // patient-facing twin has something to show straight away.
-  { role: "Patient", email: "patient2@twinrx.example", password: "DemoPatientPass123!" },
+  { role: "role.patient", email: "patient2@twinrx.example", password: "DemoPatientPass123!" },
 ];
 
 function isLocalApi(): boolean {
@@ -177,7 +178,7 @@ export default function LoginPage() {
                     }}
                     className="flex w-full items-center justify-between gap-3 rounded px-2 py-1.5 text-left transition hover:bg-ink/[0.04] disabled:opacity-60"
                   >
-                    <span className="text-[13px] text-ink">{account.role}</span>
+                    <span className="text-[13px] text-ink">{t(account.role)}</span>
                     <span className="font-mono text-[11px] text-ink-faint">{account.email}</span>
                   </button>
                 </li>

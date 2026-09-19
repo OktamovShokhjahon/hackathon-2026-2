@@ -9,6 +9,7 @@ import { inputClass } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { api, ApiError } from "@/lib/api-client";
 import { fieldLabel, formatDate, humanizeEnum } from "@/lib/format";
+import { useI18n } from "@/lib/i18n";
 
 interface HistoryRecord {
   _id: string;
@@ -36,6 +37,7 @@ function recordTitle(record: HistoryRecord): string {
 export default function PatientHistoryPage() {
   const queryClient = useQueryClient();
   const toast = useToast();
+  const { t } = useI18n();
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -49,10 +51,10 @@ export default function PatientHistoryPage() {
     onSuccess: () => {
       setNote("");
       setError(null);
-      toast("Sent to your doctor — they will see it with your record");
+      toast(t("px.histSent"));
       queryClient.invalidateQueries({ queryKey: ["me-history"] });
     },
-    onError: (err) => setError(err instanceof ApiError ? err.message : "That could not be sent"),
+    onError: (err) => setError(err instanceof ApiError ? err.message : t("px.histSendFailed")),
   });
 
   // Grouped by month so a long history stays readable as a timeline.
@@ -68,13 +70,13 @@ export default function PatientHistoryPage() {
   return (
     <AppShell role="PATIENT" navItems={PATIENT_NAV}>
       <PageHeader
-        eyebrow="Your record"
-        title="Your medical history"
-        description="Only entries your doctor has confirmed appear here. Anything still being reviewed stays with your doctor until they approve it."
-        meta={data && <MetaItem label="Entries" value={String(data.length)} />}
+        eyebrow={t("pr.eyebrow")}
+        title={t("px.histTitle")}
+        description={t("px.histDescription")}
+        meta={data && <MetaItem label={t("px.histEntries")} value={String(data.length)} />}
       />
 
-      <Panel title="Tell your doctor something" className="mb-4">
+      <Panel title={t("px.histTellDoctor")} className="mb-4">
         <form
           onSubmit={(event) => {
             event.preventDefault();
@@ -83,18 +85,17 @@ export default function PatientHistoryPage() {
           className="flex flex-col gap-3"
         >
           <label className="flex flex-col gap-1.5">
-            <span className="readout">Symptom or follow-up observation</span>
+            <span className="readout">{t("px.histObservation")}</span>
             <textarea
               value={note}
               onChange={(event) => setNote(event.target.value)}
               rows={3}
-              placeholder="For example: dizzy in the mornings since starting the new tablet."
+              placeholder={t("px.histPlaceholder")}
               className={`${inputClass} resize-y`}
             />
           </label>
           <p className="max-w-readable text-[12px] leading-relaxed text-ink-faint">
-            This is not monitored in real time. If something feels urgent, contact your doctor or
-            emergency services rather than writing it here.
+            {t("px.histNotMonitored")}
           </p>
           {error && (
             <p role="alert" className="rounded border border-state-red/40 bg-state-red/10 px-3 py-2 text-[13px] text-state-red">
@@ -105,18 +106,18 @@ export default function PatientHistoryPage() {
             disabled={note.trim().length < 3 || submitObservation.isPending}
             className="self-start rounded-md bg-electric px-4 py-2 text-sm font-medium text-white transition hover:bg-electric/90 disabled:opacity-50"
           >
-            {submitObservation.isPending ? "Sending…" : "Send to my doctor"}
+            {submitObservation.isPending ? t("px.histSending") : t("px.histSend")}
           </button>
         </form>
       </Panel>
 
-      <Panel title="Timeline">
+      <Panel title={t("px.histTimeline")}>
         {isLoading ? (
           <Skeleton rows={5} />
         ) : groups.length === 0 ? (
           <EmptyState
-            title="Nothing here yet"
-            body="Approved results, diagnoses and observations appear here as your doctor records them."
+            title={t("px.histEmpty")}
+            body={t("px.histEmptyBody")}
           />
         ) : (
           <div className="flex flex-col gap-6">

@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
-import { ORGAN_BY_KEY, STATE_GLYPH, STATE_HEX, STATE_LABEL } from "./anatomy";
+import { ORGAN_BY_KEY, STATE_GLYPH, STATE_HEX, STATE_LABEL_KEY, organLabelKey } from "./anatomy";
+import { useI18n } from "@/lib/i18n";
 import type { OrganSignal } from "./types";
 
 /** Screen-space position of each organ, written by the scene every frame. */
@@ -27,6 +28,7 @@ export function OrganLabels({
   selectedOrgan: string | null;
   onSelectOrgan: (key: string | null) => void;
 }) {
+  const { t } = useI18n();
   const container = useRef<HTMLDivElement>(null);
   const labelNodes = useRef<Record<string, HTMLButtonElement | null>>({});
   const lineNodes = useRef<Record<string, SVGPolylineElement | null>>({});
@@ -201,9 +203,9 @@ export function OrganLabels({
                   {STATE_GLYPH[signal.color]}
                 </span>
                 <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-ink">
-                  {organ?.label ?? signal.organ}
+                  {organ ? t(organLabelKey(organ.key)) : signal.organ}
                 </span>
-                <span className="sr-only">: {STATE_LABEL[signal.color]}</span>
+                <span className="sr-only">: {t(STATE_LABEL_KEY[signal.color])}</span>
               </button>
             );
           })}

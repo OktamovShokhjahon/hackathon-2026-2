@@ -13,6 +13,7 @@ import {
   YAxis,
 } from "recharts";
 import { formatDate } from "@/lib/format";
+import { useI18n } from "@/lib/i18n";
 
 export interface TrendPoint {
   /** `YYYY-MM-DD`, as grouped by the analytics endpoint. */
@@ -27,8 +28,10 @@ export interface TrendPoint {
  * "is this getting worse?" without exposing anything clinical.
  */
 export function AnalysisTrend({ data }: { data: TrendPoint[] }) {
+  const { t } = useI18n();
+
   if (data.length === 0) {
-    return <p className="py-6 text-sm text-ink-faint">No analyses have been run yet.</p>;
+    return <p className="py-6 text-sm text-ink-faint">{t("chart.noAnalysesYet")}</p>;
   }
 
   const points = data.map((point) => ({
@@ -67,8 +70,8 @@ export function AnalysisTrend({ data }: { data: TrendPoint[] }) {
             <XAxis dataKey="label" {...axis} axisLine={{ stroke: "var(--line)" }} />
             <YAxis allowDecimals={false} {...axis} axisLine={false} width={36} />
             {tooltip}
-            <Bar dataKey="analyses" name="Analyses" fill="var(--signal)" radius={[3, 3, 0, 0]} maxBarSize={56} />
-            <Bar dataKey="highPriority" name="High-priority" fill="var(--state-red)" radius={[3, 3, 0, 0]} maxBarSize={56} />
+            <Bar dataKey="analyses" name={t("chart.analyses")} fill="var(--signal)" radius={[3, 3, 0, 0]} maxBarSize={56} />
+            <Bar dataKey="highPriority" name={t("chart.highPriority")} fill="var(--state-red)" radius={[3, 3, 0, 0]} maxBarSize={56} />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -112,7 +115,7 @@ export function AnalysisTrend({ data }: { data: TrendPoint[] }) {
           <Area
             type="monotone"
             dataKey="analyses"
-            name="Analyses"
+            name={t("chart.analyses")}
             stroke="var(--signal)"
             strokeWidth={1.5}
             fill="url(#analysisVolume)"
@@ -120,7 +123,7 @@ export function AnalysisTrend({ data }: { data: TrendPoint[] }) {
           <Line
             type="monotone"
             dataKey="highPriority"
-            name="High-priority"
+            name={t("chart.highPriority")}
             stroke="var(--state-red)"
             strokeWidth={1.5}
             dot={false}

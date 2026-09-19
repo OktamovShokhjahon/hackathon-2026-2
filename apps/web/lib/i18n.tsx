@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { uz, type MessageKey } from "./locales/uz";
 import { en } from "./locales/en";
 import { ru } from "./locales/ru";
+import { bindFormatLocale } from "./format";
 
 export type Locale = "uz" | "en" | "ru";
 
@@ -83,6 +84,15 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     },
     [locale]
   );
+
+  // Dates, relative times and clinical field names are formatted outside React
+  // by `lib/format`. Binding here rather than in each caller means the whole
+  // console — including text a component renders from a helper — switches
+  // together, instead of leaving English dates under Uzbek headings.
+  //
+  // Bound during render, not in an effect: a child rendering in the same pass
+  // would otherwise format its first output with the previous locale.
+  bindFormatLocale(HTML_LANG[locale], t as (key: string) => string);
 
   const value = useMemo(() => ({ locale, setLocale, t }), [locale, setLocale, t]);
 

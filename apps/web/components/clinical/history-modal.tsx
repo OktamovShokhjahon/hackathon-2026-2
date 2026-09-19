@@ -4,25 +4,27 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Field, Modal, inputClass } from "@/components/ui/modal";
 import { api, ApiError } from "@/lib/api-client";
+import { useI18n } from "@/lib/i18n";
+import type { MessageKey } from "@/lib/locales/uz";
 
 const RECORD_TYPES = [
-  { value: "symptom", label: "Symptom" },
-  { value: "lab_result", label: "Lab result" },
-  { value: "vital_sign", label: "Vital sign" },
-  { value: "procedure", label: "Procedure" },
-  { value: "allergy", label: "Allergy" },
-  { value: "lifestyle_observation", label: "Lifestyle observation" },
-  { value: "diagnosis", label: "Past diagnosis" },
-  { value: "medication", label: "Past medication" },
-] as const;
+  { value: "symptom", label: "hm.type.symptom" },
+  { value: "lab_result", label: "hm.type.lab_result" },
+  { value: "vital_sign", label: "hm.type.vital_sign" },
+  { value: "procedure", label: "hm.type.procedure" },
+  { value: "allergy", label: "hm.type.allergy" },
+  { value: "lifestyle_observation", label: "hm.type.lifestyle_observation" },
+  { value: "diagnosis", label: "hm.type.diagnosis" },
+  { value: "medication", label: "hm.type.medication" },
+] as const satisfies ReadonlyArray<{ value: string; label: MessageKey }>;
 
 const SOURCES = [
-  { value: "doctor_entry", label: "You entered it" },
-  { value: "patient_report", label: "The patient reported it" },
-  { value: "laboratory", label: "A laboratory" },
-  { value: "external_document", label: "An outside document" },
-  { value: "other", label: "Other" },
-] as const;
+  { value: "doctor_entry", label: "hm.src.doctor_entry" },
+  { value: "patient_report", label: "hm.src.patient_report" },
+  { value: "laboratory", label: "hm.src.laboratory" },
+  { value: "external_document", label: "hm.src.external_document" },
+  { value: "other", label: "hm.src.other" },
+] as const satisfies ReadonlyArray<{ value: string; label: MessageKey }>;
 
 const EMPTY = {
   type: "symptom" as (typeof RECORD_TYPES)[number]["value"],
@@ -53,6 +55,7 @@ export function HistoryModal({
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
+  const { t } = useI18n();
   const [form, setForm] = useState(EMPTY);
   const [error, setError] = useState<string | null>(null);
   const [savedCount, setSavedCount] = useState(0);
@@ -83,7 +86,7 @@ export function HistoryModal({
       queryClient.invalidateQueries({ queryKey: ["scenarios", patientId] });
     },
     onError: (err) =>
-      setError(err instanceof ApiError ? err.message : "Could not save this record"),
+      setError(err instanceof ApiError ? err.message : t("hm.saveFailed")),
   });
 
   function close() {
@@ -97,13 +100,13 @@ export function HistoryModal({
       open={open}
       onClose={close}
       size="lg"
-      title="Add past history"
-      description="Optional. Add what you have — one record at a time, and come back to the rest whenever."
+      title={t("hm.title")}
+      description={t("hm.description")}
       footer={
         <>
           {savedCount > 0 && (
             <span className="mr-auto font-mono text-[11px] uppercase tracking-[0.1em] text-state-green">
-              {savedCount} record{savedCount > 1 ? "s" : ""} saved
+              {t("hm.saved", { count: savedCount })}
             </span>
           )}
           <button
@@ -111,7 +114,7 @@ export function HistoryModal({
             onClick={close}
             className="rounded border border-[color:var(--line)] px-4 py-2 text-sm text-ink transition hover:bg-ink/[0.04]"
           >
-            Done
+            {t("action.done")}
           </button>
           <button
             type="submit"
@@ -119,7 +122,7 @@ export function HistoryModal({
             disabled={addRecord.isPending}
             className="rounded bg-electric px-4 py-2 text-sm font-medium text-white transition hover:bg-electric/90 disabled:opacity-60"
           >
-            {addRecord.isPending ? "Saving…" : "Save and add another"}
+            {addRecord.isPending ? t("action.saving") : t("hm.saveAndAdd")}
           </button>
         </>
       }
@@ -133,7 +136,7 @@ export function HistoryModal({
         className="flex flex-col gap-4"
       >
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Record type">
+          <Field label={t("hm.recordType")}>
             <select
               value={form.type}
               onChange={(e) =>
@@ -143,13 +146,13 @@ export function HistoryModal({
             >
               {RECORD_TYPES.map((option) => (
                 <option key={option.value} value={option.value}>
-                  {option.label}
+                  {t(option.label)}
                 </option>
               ))}
             </select>
           </Field>
 
-          <Field label="When">
+          <Field label={t("hm.when")}>
             <input
               type="date"
               required
@@ -161,10 +164,10 @@ export function HistoryModal({
           </Field>
         </div>
 
-        <Field label="Description">
+        <Field label={t("hm.description2")}>
           <input
             required
-            placeholder="e.g. Reported morning dizziness"
+            placeholder={t("hm.descriptionPlaceholder")}
             value={form.description}
             onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
             className={inputClass}
@@ -173,15 +176,15 @@ export function HistoryModal({
 
         {measurable && (
           <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="Measurement" hint="Named so the rules can read it.">
+            <Field label={t("hm.measurement")} hint={t("hm.measurementHint")}>
               <input
-                placeholder="e.g. egfr"
+                placeholder={t("hm.measurementPlaceholder")}
                 value={form.field}
                 onChange={(e) => setForm((f) => ({ ...f, field: e.target.value }))}
                 className={inputClass}
               />
             </Field>
-            <Field label="Value">
+            <Field label={t("hm.value")}>
               <input
                 type="number"
                 step="any"
@@ -190,9 +193,9 @@ export function HistoryModal({
                 className={inputClass}
               />
             </Field>
-            <Field label="Unit">
+            <Field label={t("hm.unit")}>
               <input
-                placeholder="e.g. mL/min"
+                placeholder={t("hm.unitPlaceholder")}
                 value={form.unit}
                 onChange={(e) => setForm((f) => ({ ...f, unit: e.target.value }))}
                 className={inputClass}
@@ -201,7 +204,7 @@ export function HistoryModal({
           </div>
         )}
 
-        <Field label="Where it came from">
+        <Field label={t("hm.whereFrom")}>
           <select
             value={form.sourceType}
             onChange={(e) =>
@@ -211,13 +214,13 @@ export function HistoryModal({
           >
             {SOURCES.map((option) => (
               <option key={option.value} value={option.value}>
-                {option.label}
+                {t(option.label)}
               </option>
             ))}
           </select>
         </Field>
 
-        <Field label="Note" hint="Optional.">
+        <Field label={t("hm.note")} hint={t("hm.noteHint")}>
           <textarea
             rows={2}
             value={form.note}

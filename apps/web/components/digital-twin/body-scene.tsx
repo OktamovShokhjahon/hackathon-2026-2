@@ -11,12 +11,15 @@ import {
   STATE_GLYPH,
   STATE_HEX,
   STATE_HEX_3D,
-  STATE_LABEL,
+  STATE_LABEL_KEY,
+  organLabelKey,
+  systemLabelKey,
   type OrganDef,
   type Sex,
 } from "./anatomy";
 import type { Projection } from "./organ-labels";
 import type { OrganSignal, RiskColor } from "./types";
+import { useI18n } from "@/lib/i18n";
 
 export type TwinView = "front" | "back" | "left" | "right";
 
@@ -90,6 +93,7 @@ function Organ({
   selected: boolean;
   onSelect: (key: string | null) => void;
 }) {
+  const { t } = useI18n();
   const groupRef = useRef<THREE.Group>(null);
   const [hovered, setHovered] = useState(false);
   const materials = useRef<THREE.MeshStandardMaterial[]>([]);
@@ -265,7 +269,8 @@ function Organ({
         <group ref={cardRef} position={organ.sites[0].position}>
         <Html
           center
-          distanceFactor={2.2}
+          /* No distanceFactor: the card is chrome, not anatomy, so it keeps one
+             legible size instead of swelling to fill the stage as you zoom in. */
           zIndexRange={[30, 0]}
           style={{ pointerEvents: "none" }}
         >
@@ -276,14 +281,14 @@ function Organ({
               // Organs high in the body would push the card off the top of the
               // stage, so those flip below the organ instead.
               transform:
-                organ.sites[0].position[1] > 1.45 ? "translateY(76px)" : "translateY(-76px)",
+                organ.sites[0].position[1] > 1.45 ? "translateY(86px)" : "translateY(-86px)",
             }}
           >
             <div className="font-mono text-[9px] uppercase tracking-[0.16em] text-ink-faint">
-              {organ.system}
+              {t(systemLabelKey(organ.system))}
             </div>
             <div className="mt-0.5 font-display text-[15px] leading-tight text-ink">
-              {organ.label}
+              {t(organLabelKey(organ.key))}
             </div>
 
             <div
@@ -291,13 +296,13 @@ function Organ({
               style={{ color: hoveredState ? STATE_HEX[hoveredState] : "var(--ink-faint)" }}
             >
               <span aria-hidden>{hoveredState ? STATE_GLYPH[hoveredState] : "–"}</span>
-              {hoveredState ? STATE_LABEL[hoveredState] : "Not assessed"}
+              {hoveredState ? t(STATE_LABEL_KEY[hoveredState]) : t("twin.notAssessed")}
             </div>
 
             <p className="mt-2 text-[12px] leading-relaxed text-ink-muted">
               {hoveredSignal
                 ? hoveredSignal.explanation
-                : "This scenario did not assess this organ. That is not the same as a clear result."}
+                : t("twin.notAssessedBody")}
             </p>
 
             {hoveredSignal && hoveredSignal.missingData.length > 0 && (
@@ -408,26 +413,128 @@ function dissectionFor(distance: number): number {
   return clamped * clamped * (3 - 2 * clamped);
 }
 
-function CameraRig({ view }: { view: TwinView }) {
+/** The slice of OrbitControls this scene drives directly. */
+type Orbit = { target: THREE.Vector3; update: () => void };
+
+/** How far the focus point may wander from the body while zooming into a spot. */
+const FOCUS_LIMIT = new THREE.Vector3(0.5, 0.7, 0.5);
+
+/**
+ * Keeps the point the camera orbits inside the body's own envelope, so zooming
+ * towards an edge cannot strand the view on empty background. The camera moves
+ * with it, which preserves the framing the viewer just asked for.
+ */
+function clampFocus(focus: THREE.Vector3, camera: THREE.Camera) {
+  const x = THREE.MathUtils.clamp(focus.x, TARGET.x - FOCUS_LIMIT.x, TARGET.x + FOCUS_LIMIT.x);
+  const y = THREE.MathUtils.clamp(focus.y, TARGET.y - FOCUS_LIMIT.y, TARGET.y + FOCUS_LIMIT.y);
+  const z = THREE.MathUtils.clamp(focus.z, TARGET.z - FOCUS_LIMIT.z, TARGET.z + FOCUS_LIMIT.z);
+  camera.position.x += x - focus.x;
+  camera.position.y += y - focus.y;
+  camera.position.z += z - focus.z;
+  focus.set(x, y, z);
+}
+
+function CameraRig({
+  view,
+  controlsRef,
+}: {
+  view: TwinView;
+  controlsRef: MutableRefObject<Orbit | null>;
+}) {
   const { camera } = useThree();
   const goal = useMemo(() => new THREE.Vector3(...CAMERA_PRESETS.front), []);
   const settling = useRef(false);
 
   useEffect(() => {
     // Turning the body must not undo the zoom, so a view change re-aims the
-    // camera along the new axis while keeping the distance the viewer chose.
+    // camera along the new axis while keeping the distance the viewer chose —
+    // and keeps orbiting whatever they zoomed in on.
+    const focus = controlsRef.current?.target ?? TARGET;
     const preset = new THREE.Vector3(...CAMERA_PRESETS[view]);
-    const distance = camera.position.distanceTo(TARGET) || FULL_BODY_DISTANCE;
-    goal.copy(preset).sub(TARGET).normalize().multiplyScalar(distance).add(TARGET);
+    const distance = camera.position.distanceTo(focus) || FULL_BODY_DISTANCE;
+    goal.copy(preset).sub(TARGET).normalize().multiplyScalar(distance).add(focus);
     settling.current = true;
-  }, [view, goal, camera]);
+  }, [view, goal, camera, controlsRef]);
 
   useFrame(() => {
     if (!settling.current) return;
     camera.position.lerp(goal, 0.08);
-    camera.lookAt(TARGET);
+    if (controlsRef.current) controlsRef.current.update();
+    else camera.lookAt(TARGET);
     if (camera.position.distanceTo(goal) < 0.02) settling.current = false;
   });
+
+  return null;
+}
+
+/**
+ * Wheel zoom that goes where the cursor points. Dollying at a fixed centre
+ * slides the organ you were aiming at out of frame exactly as you close in on
+ * it; here the point under the cursor stays put, the way a map behaves.
+ */
+function CursorZoom({
+  controlsRef,
+  grabbedRef,
+}: {
+  controlsRef: MutableRefObject<Orbit | null>;
+  grabbedRef: MutableRefObject<boolean>;
+}) {
+  const { camera, gl } = useThree();
+
+  useEffect(() => {
+    const element = gl.domElement;
+    const ndc = new THREE.Vector2();
+    const raycaster = new THREE.Raycaster();
+    const plane = new THREE.Plane();
+    const anchor = new THREE.Vector3();
+    const normal = new THREE.Vector3();
+
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      grabbedRef.current = true;
+      const focus = controlsRef.current?.target ?? TARGET;
+      const distance = camera.position.distanceTo(focus);
+      if (distance < 1e-4) return;
+
+      // deltaMode 1 is line-based (Firefox); normalise it to pixels first.
+      const delta = event.deltaY * (event.deltaMode === 1 ? 16 : 1);
+      const next = Math.min(
+        FULL_BODY_DISTANCE,
+        Math.max(CLOSEST_DISTANCE, distance * Math.exp(delta * 0.0012)),
+      );
+      const scale = next / distance;
+      if (!Number.isFinite(scale) || Math.abs(scale - 1) < 1e-4) return;
+
+      // The anchor is where the cursor points, on the plane the focus sits in.
+      const rect = element.getBoundingClientRect();
+      ndc.set(
+        ((event.clientX - rect.left) / rect.width) * 2 - 1,
+        -((event.clientY - rect.top) / rect.height) * 2 + 1,
+      );
+      raycaster.setFromCamera(ndc, camera);
+      camera.getWorldDirection(normal);
+      plane.setFromNormalAndCoplanarPoint(normal, focus);
+      if (!raycaster.ray.intersectPlane(plane, anchor)) anchor.copy(focus);
+
+      // Scaling camera and focus about the anchor pins the anchor on screen.
+      // Zooming back out aims at the body centre instead, so you always end up
+      // framed on the whole patient again.
+      const pivot = scale < 1 ? anchor : TARGET;
+      camera.position.sub(pivot).multiplyScalar(scale).add(pivot);
+
+      const target = controlsRef.current?.target;
+      if (target) {
+        target.sub(pivot).multiplyScalar(scale).add(pivot);
+        clampFocus(target, camera);
+        controlsRef.current?.update();
+      } else {
+        camera.lookAt(TARGET);
+      }
+    };
+
+    element.addEventListener("wheel", onWheel, { passive: false });
+    return () => element.removeEventListener("wheel", onWheel);
+  }, [camera, gl, controlsRef, grabbedRef]);
 
   return null;
 }
@@ -440,16 +547,23 @@ function ZoomReporter({
   dissectRef,
   onZoomChange,
   controlsRef,
+  orbitRef,
+  turntableRef,
+  grabbedRef,
 }: {
   dissectRef: MutableRefObject<number>;
   onZoomChange?: (zoom: number) => void;
   controlsRef: MutableRefObject<ZoomApi | null>;
+  orbitRef: MutableRefObject<Orbit | null>;
+  turntableRef: MutableRefObject<THREE.Group | null>;
+  grabbedRef: MutableRefObject<boolean>;
 }) {
   const { camera } = useThree();
   const lastReported = useRef(-1);
 
   useFrame(() => {
-    const distance = camera.position.distanceTo(TARGET);
+    const focus = orbitRef.current?.target ?? TARGET;
+    const distance = camera.position.distanceTo(focus);
     dissectRef.current = dissectionFor(distance);
 
     const zoom = FULL_BODY_DISTANCE / Math.max(distance, 0.0001);
@@ -465,24 +579,34 @@ function ZoomReporter({
   useEffect(() => {
     controlsRef.current = {
       zoomBy(factor: number) {
-        const direction = camera.position.clone().sub(TARGET);
+        // The buttons have no cursor to aim at, so they dolly along whatever
+        // the wheel last centred on.
+        const focus = orbitRef.current?.target ?? TARGET;
+        const direction = camera.position.clone().sub(focus);
         const next = Math.min(
           FULL_BODY_DISTANCE,
           Math.max(CLOSEST_DISTANCE, direction.length() / factor),
         );
-        camera.position.copy(direction.normalize().multiplyScalar(next).add(TARGET));
-        camera.lookAt(TARGET);
+        camera.position.copy(direction.normalize().multiplyScalar(next).add(focus));
+        if (orbitRef.current) orbitRef.current.update();
+        else camera.lookAt(focus);
       },
       reset() {
-        const direction = camera.position.clone().sub(TARGET).normalize();
-        camera.position.copy(direction.multiplyScalar(FULL_BODY_DISTANCE).add(TARGET));
-        camera.lookAt(TARGET);
+        // Everything the viewer can move goes back at once — distance, the
+        // point being orbited and the angle they turned to — so this button is
+        // always a way back to the view the twin opened on.
+        camera.position.set(...CAMERA_PRESETS.front);
+        orbitRef.current?.target.copy(TARGET);
+        if (turntableRef.current) turntableRef.current.rotation.y = 0;
+        grabbedRef.current = false;
+        if (orbitRef.current) orbitRef.current.update();
+        else camera.lookAt(TARGET);
       },
     };
     return () => {
       controlsRef.current = null;
     };
-  }, [camera, controlsRef]);
+  }, [camera, controlsRef, orbitRef, turntableRef, grabbedRef]);
 
   return null;
 }
@@ -494,16 +618,23 @@ function ZoomReporter({
  */
 function Turntable({
   enabled,
+  grabbedRef,
   groupRef,
   children,
 }: {
   enabled: boolean;
+  /** True once the viewer has moved the camera themselves. */
+  grabbedRef: MutableRefObject<boolean>;
   groupRef: MutableRefObject<THREE.Group | null>;
   children: React.ReactNode;
 }) {
   const ref = groupRef;
   useFrame(({ clock }) => {
     if (!ref.current) return;
+    // The sway writes rotation.y every frame, so it would drift the body back
+    // under someone reading a zoomed-in organ. It stops once they take hold,
+    // and the default-view button starts it again.
+    if (grabbedRef.current) return;
     const goal = enabled ? Math.sin(clock.elapsedTime * 0.26) * 0.2 : 0;
     ref.current.rotation.y += (goal - ref.current.rotation.y) * 0.05;
   });
@@ -557,6 +688,8 @@ export function BodyScene({
   const dissectRef = useRef(0);
   const siteRegistry = useRef<Record<string, Array<THREE.Group | null>>>({});
   const fallbackZoomApi = useRef<ZoomApi | null>(null);
+  const orbitRef = useRef<Orbit | null>(null);
+  const grabbedRef = useRef(false);
 
   const states = useMemo(
     () => buildStates(organs, beforeSignals, afterSignals),
@@ -584,11 +717,15 @@ export function BodyScene({
       <directionalLight position={[2.5, 3.5, 2.5]} intensity={1.5} color="#ffffff" />
       <directionalLight position={[-2.5, 1.5, -1.5]} intensity={0.5} color="#dbe7f3" />
 
-      <CameraRig view={view} />
+      <CameraRig view={view} controlsRef={orbitRef} />
+      <CursorZoom controlsRef={orbitRef} grabbedRef={grabbedRef} />
       <ZoomReporter
         dissectRef={dissectRef}
         onZoomChange={onZoomChange}
         controlsRef={zoomApi ?? fallbackZoomApi}
+        orbitRef={orbitRef}
+        turntableRef={turntableRef}
+        grabbedRef={grabbedRef}
       />
       <Projector
         organs={organs}
@@ -597,7 +734,11 @@ export function BodyScene({
         sites={siteRegistry}
       />
 
-      <Turntable enabled={autoRotate && !reducedMotion} groupRef={turntableRef}>
+      <Turntable
+        enabled={autoRotate && !reducedMotion}
+        grabbedRef={grabbedRef}
+        groupRef={turntableRef}
+      >
         <Ribcage dissectRef={dissectRef} />
         <Vasculature states={states} mixRef={mixRef} />
         {organs.map((organ) => (
@@ -620,10 +761,12 @@ export function BodyScene({
       </Turntable>
 
       <OrbitControls
+        ref={orbitRef as never}
         target={TARGET}
         enablePan={false}
-        enableZoom
-        zoomSpeed={0.7}
+        /* Zoom is handled by CursorZoom, which aims at the cursor rather than
+           at the fixed centre OrbitControls would dolly towards. */
+        enableZoom={false}
         minDistance={CLOSEST_DISTANCE}
         maxDistance={FULL_BODY_DISTANCE}
         minPolarAngle={Math.PI / 3.4}

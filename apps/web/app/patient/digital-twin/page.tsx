@@ -8,6 +8,8 @@ import { DigitalTwinViewer } from "@/components/digital-twin/digital-twin-viewer
 import { api } from "@/lib/api-client";
 import type { OrganSignal } from "@/components/digital-twin/types";
 import { twinSex } from "@/components/digital-twin/anatomy";
+import { useI18n } from "@/lib/i18n";
+import { formatDate } from "@/lib/format";
 
 interface Scenario {
   _id: string;
@@ -26,6 +28,7 @@ interface Scenario {
 const HORIZONS = [7, 30, 90, 365];
 
 export default function PatientDigitalTwinPage() {
+  const { t } = useI18n();
   const { data, isLoading, isError } = useQuery({
     queryKey: ["approved-scenarios"],
     queryFn: () => api.get<Scenario[]>("/me/approved-scenarios"),
@@ -48,19 +51,18 @@ export default function PatientDigitalTwinPage() {
   return (
     <AppShell role="PATIENT" navItems={PATIENT_NAV}>
       <div className="max-w-5xl">
-        <span className="readout">Your digital twin</span>
+        <span className="readout">{t("ptw.eyebrow")}</span>
         <h1 className="display mt-2 text-[30px] leading-tight text-ink">
-          What your doctor&rsquo;s plan could change
+          {t("ptw.title")}
         </h1>
         <p className="mt-3 max-w-readable text-[15px] leading-relaxed text-ink-muted">
-          This is an educational scenario your doctor approved. It shows a possible direction over
-          the time you choose — it is not a prediction of your health and it is not medical advice.
+          {t("ptw.description")}
         </p>
 
         <div className="rail my-8" />
 
         {isLoading && (
-          <div className="h-[480px] animate-pulse rounded-lg bg-ink/[0.035]" role="status" aria-label="Loading your twin" />
+          <div className="h-[480px] animate-pulse rounded-lg bg-ink/[0.035]" role="status" aria-label={t("ptw.loading")} />
         )}
 
         {isError && (
@@ -68,9 +70,9 @@ export default function PatientDigitalTwinPage() {
             className="rounded-lg border p-6"
             style={{ borderColor: "var(--line-strong)" }}
           >
-            <h2 className="display text-[17px] text-ink">Your twin could not load</h2>
+            <h2 className="display text-[17px] text-ink">{t("ptw.errorTitle")}</h2>
             <p className="mt-2 text-sm text-ink-muted">
-              Check your connection and reload the page. Your records are unchanged.
+              {t("ptw.errorBody")}
             </p>
           </div>
         )}
@@ -79,7 +81,7 @@ export default function PatientDigitalTwinPage() {
           <div className="panel p-5">
             <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
               <span className="readout">
-                Approved {new Date(scenario.createdAt).toLocaleDateString()}
+                {t("ptw.approved", { date: formatDate(scenario.createdAt) })}
               </span>
               <RiskBadge color={scenario.overallRisk} />
             </div>
@@ -104,10 +106,9 @@ export default function PatientDigitalTwinPage() {
 
         {!isLoading && !isError && !scenario && (
           <div className="rounded-lg border p-8" style={{ borderColor: "var(--line)" }}>
-            <h2 className="display text-[17px] text-ink">No approved scenario yet</h2>
+            <h2 className="display text-[17px] text-ink">{t("ptw.noneTitle")}</h2>
             <p className="mt-2 max-w-readable text-sm leading-relaxed text-ink-muted">
-              Your doctor publishes a scenario here after reviewing it. Ask about it at your next
-              visit.
+              {t("ptw.noneBody")}
             </p>
           </div>
         )}

@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { STATE_GLYPH, STATE_HEX, STATE_LABEL } from "@/components/digital-twin/anatomy";
+import { STATE_GLYPH, STATE_HEX, STATE_LABEL_KEY } from "@/components/digital-twin/anatomy";
+import { useI18n } from "@/lib/i18n";
 import type { RiskColor } from "@/components/digital-twin/types";
 
 /* ---------------------------------------------------------------- header */
@@ -89,6 +90,7 @@ export function QueueCard({
   kind?: "queue" | "stat";
   index?: number;
 }) {
+  const { t } = useI18n();
   const isQueue = kind === "queue";
   const active = count > 0;
   const clear = isQueue && !active;
@@ -125,7 +127,7 @@ export function QueueCard({
         {count}
       </div>
       <p className="mt-2 text-[12px] leading-snug text-ink-faint">
-        {clear ? "Nothing waiting" : hint}
+        {clear ? t("console.nothingWaiting") : hint}
       </p>
     </Link>
   );
@@ -139,11 +141,12 @@ export function QueueCard({
  * product's own colour semantics rather than inventing a chart palette.
  */
 export function RiskRibbon({ counts }: { counts: Record<RiskColor, number> }) {
+  const { t } = useI18n();
   const order: RiskColor[] = ["red", "yellow", "green"];
   const total = order.reduce((sum, key) => sum + counts[key], 0);
 
   if (total === 0) {
-    return <p className="text-sm text-ink-faint">No analyses in range.</p>;
+    return <p className="text-sm text-ink-faint">{t("console.noAnalysesInRange")}</p>;
   }
 
   return (
@@ -153,7 +156,7 @@ export function RiskRibbon({ counts }: { counts: Record<RiskColor, number> }) {
         role="img"
         aria-label={order
           .filter((key) => counts[key] > 0)
-          .map((key) => `${counts[key]} ${STATE_LABEL[key]}`)
+          .map((key) => `${counts[key]} ${t(STATE_LABEL_KEY[key])}`)
           .join(", ")}
       >
         {order.map((key) =>
@@ -176,7 +179,7 @@ export function RiskRibbon({ counts }: { counts: Record<RiskColor, number> }) {
               {STATE_GLYPH[key]}
             </span>
             <span className="font-mono text-[15px] tabular-nums text-ink">{counts[key]}</span>
-            <span className="text-[12px] text-ink-faint">{STATE_LABEL[key]}</span>
+            <span className="text-[12px] text-ink-faint">{t(STATE_LABEL_KEY[key])}</span>
           </li>
         ))}
       </ul>
@@ -196,10 +199,11 @@ export function DistributionBars({
 }: {
   items: Array<{ label: string; count: number }>;
 }) {
+  const { t } = useI18n();
   const max = Math.max(1, ...items.map((item) => item.count));
 
   if (items.length === 0) {
-    return <p className="text-sm text-ink-faint">Nothing recorded yet.</p>;
+    return <p className="text-sm text-ink-faint">{t("console.nothingRecordedYet")}</p>;
   }
 
   return (
@@ -261,8 +265,9 @@ export function EmptyState({ title, body, action }: { title: string; body: strin
 
 /** Skeletons hold the layout so nothing jumps when the data lands. */
 export function Skeleton({ rows = 3 }: { rows?: number }) {
+  const { t } = useI18n();
   return (
-    <div className="flex flex-col gap-2" role="status" aria-label="Loading">
+    <div className="flex flex-col gap-2" role="status" aria-label={t("console.loading")}>
       {Array.from({ length: rows }).map((_, index) => (
         <div
           key={index}
@@ -337,6 +342,8 @@ export function Tabs({
   onChange: (id: string) => void;
   className?: string;
 }) {
+  const { t } = useI18n();
+
   function onKeyDown(event: React.KeyboardEvent) {
     const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
     if (!step) return;
@@ -349,7 +356,7 @@ export function Tabs({
   return (
     <div
       role="tablist"
-      aria-label="Chart sections"
+      aria-label={t("console.chartSections")}
       onKeyDown={onKeyDown}
       className={`flex items-stretch gap-1 overflow-x-auto border-b border-[color:var(--line)] ${className}`}
     >

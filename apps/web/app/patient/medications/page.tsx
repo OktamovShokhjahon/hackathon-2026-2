@@ -5,6 +5,7 @@ import { AppShell, PATIENT_NAV } from "@/components/ui/app-shell";
 import { EmptyState, MetaItem, PageHeader, Panel, Skeleton } from "@/components/ui/console";
 import { api } from "@/lib/api-client";
 import { formatDate, humanizeEnum } from "@/lib/format";
+import { useI18n } from "@/lib/i18n";
 
 interface Medication {
   _id: string;
@@ -21,6 +22,7 @@ interface Medication {
 }
 
 export default function PatientMedicationsPage() {
+  const { t } = useI18n();
   const { data, isLoading } = useQuery({
     queryKey: ["me-medications"],
     queryFn: () => api.get<Medication[]>("/me/medications"),
@@ -32,39 +34,39 @@ export default function PatientMedicationsPage() {
   return (
     <AppShell role="PATIENT" navItems={PATIENT_NAV}>
       <PageHeader
-        eyebrow="Your record"
-        title="Medications"
-        description="Exactly as your doctor entered them. Do not change a dose based on this page — ask your doctor first."
+        eyebrow={t("pr.eyebrow")}
+        title={t("px.medTitle")}
+        description={t("px.medDescription")}
         meta={
           data && (
             <>
-              <MetaItem label="Current" value={String(active.length)} />
-              <MetaItem label="Stopped" value={String(stopped.length)} />
+              <MetaItem label={t("px.medCurrent")} value={String(active.length)} />
+              <MetaItem label={t("px.medStopped")} value={String(stopped.length)} />
             </>
           )
         }
       />
 
       {isLoading ? (
-        <Panel title="Medications">
+        <Panel title={t("px.medTitle")}>
           <Skeleton rows={3} />
         </Panel>
       ) : (data?.length ?? 0) === 0 ? (
-        <Panel title="Medications">
+        <Panel title={t("px.medTitle")}>
           <EmptyState
-            title="No medications listed"
-            body="Anything your doctor prescribes appears here with its dose and instructions."
+            title={t("px.medNone")}
+            body={t("px.medNoneBody")}
           />
         </Panel>
       ) : (
         <div className="flex flex-col gap-4">
           {[
-            { title: "Taking now", rows: active },
-            { title: "No longer taking", rows: stopped },
+            { key: "active", title: t("px.medTakingNow"), rows: active },
+            { key: "stopped", title: t("px.medNoLonger"), rows: stopped },
           ]
             .filter((group) => group.rows.length > 0)
             .map((group) => (
-              <div key={group.title}>
+              <div key={group.key}>
                 <h2 className="readout mb-2">{group.title}</h2>
                 <div className="grid gap-3 sm:grid-cols-2">
                   {group.rows.map((medication) => (
@@ -92,12 +94,12 @@ export default function PatientMedicationsPage() {
                       </p>
                       <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.1em] text-ink-faint">
                         {humanizeEnum(medication.route)}
-                        {medication.startDate ? ` · since ${formatDate(medication.startDate)}` : ""}
+                        {medication.startDate ? t("px.medSince", { date: formatDate(medication.startDate) }) : ""}
                       </p>
 
                       {medication.purpose && (
                         <p className="mt-3 border-t border-[color:var(--line)] pt-3 text-[13px] leading-relaxed text-ink-muted">
-                          What it is for: {medication.purpose}
+                          {t("px.medPurpose", { purpose: medication.purpose })}
                         </p>
                       )}
                     </article>

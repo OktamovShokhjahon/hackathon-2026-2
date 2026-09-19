@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AppShell, PATIENT_NAV } from "@/components/ui/app-shell";
 import { api } from "@/lib/api-client";
+import { useI18n } from "@/lib/i18n";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -16,6 +17,7 @@ interface Conversation {
 }
 
 export default function PatientChatPage() {
+  const { t } = useI18n();
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -48,10 +50,9 @@ export default function PatientChatPage() {
 
   return (
     <AppShell role="PATIENT" navItems={PATIENT_NAV}>
-      <h1 className="mb-2 text-2xl font-semibold text-ink">Health assistant</h1>
+      <h1 className="mb-2 text-2xl font-semibold text-ink">{t("pc.title")}</h1>
       <p className="mb-4 text-xs text-ink-faint">
-        AI-generated educational answers only. Not a substitute for your clinician. In an emergency, contact emergency
-        services immediately.
+        {t("pc.disclaimer")}
       </p>
       <div className="panel flex h-[60vh] flex-col p-4">
         <div className="flex-1 space-y-3 overflow-y-auto pr-2">
@@ -76,7 +77,7 @@ export default function PatientChatPage() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && send()}
-            placeholder="Ask an educational question about your medications or results..."
+            placeholder={t("pc.placeholder")}
             className="flex-1 rounded-lg border border-[color:var(--line)] bg-ink/[0.04] px-3 py-2 text-ink"
           />
           <button
@@ -84,7 +85,7 @@ export default function PatientChatPage() {
             disabled={sending || !conversationId}
             className="rounded-lg bg-electric px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
           >
-            Send
+            {t("pc.send")}
           </button>
         </div>
       </div>

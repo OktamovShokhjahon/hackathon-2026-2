@@ -4,13 +4,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { OrganMap } from "./organ-map";
 import { BodyDiagram } from "./body-diagram";
-import { STATE_GLYPH, STATE_HEX, STATE_LABEL, type Sex } from "./anatomy";
+import { STATE_GLYPH, STATE_HEX, STATE_LABEL_KEY, type Sex } from "./anatomy";
 import { OrganLabels, type Projection } from "./organ-labels";
 import type { OrganSignal, RiskColor } from "./types";
 import type { TwinView, ZoomApi } from "./body-scene";
 import { ZoomControls } from "./zoom-controls";
+import { HorizonTimeline } from "./horizon-timeline";
 import { ProvenanceChip } from "@/components/ui/provenance-chip";
 import { usePrefersReducedMotion } from "@/lib/use-reduced-motion";
+import { formatDateTime } from "@/lib/format";
+import { useI18n } from "@/lib/i18n";
+import type { MessageKey } from "@/lib/locales/uz";
 
 const BodyScene = dynamic(() => import("./body-scene").then((m) => m.BodyScene), {
   ssr: false,
@@ -26,11 +30,11 @@ function detectWebGL(): boolean {
   }
 }
 
-const VIEWS: Array<{ id: TwinView; label: string }> = [
-  { id: "front", label: "Front" },
-  { id: "back", label: "Back" },
-  { id: "left", label: "Left" },
-  { id: "right", label: "Right" },
+const VIEWS: Array<{ id: TwinView; label: MessageKey }> = [
+  { id: "front", label: "twin.front" },
+  { id: "back", label: "twin.back" },
+  { id: "left", label: "twin.left" },
+  { id: "right", label: "twin.right" },
 ];
 
 /** Worst state wins, so the summary never reads calmer than the anatomy. */
@@ -64,6 +68,7 @@ export function DigitalTwinViewer({
     stale?: boolean;
   };
 }) {
+  const { t } = useI18n();
   const reducedMotion = usePrefersReducedMotion();
   const [webglSupported, setWebglSupported] = useState<boolean | null>(null);
   const [prefer2d, setPrefer2d] = useState(false);
@@ -114,6 +119,20 @@ export function DigitalTwinViewer({
     if (animation.current) cancelAnimationFrame(animation.current);
   }, []);
 
+  const selectHorizon = useCallback(
+    (days: number) => {
+      // Day 0 is the verified baseline, so it morphs the body back rather than
+      // asking the server for another projection.
+      if (days === 0) {
+        animateTo(0);
+        return;
+      }
+      if (days !== horizonDays) onHorizonChange?.(days);
+      animateTo(1);
+    },
+    [animateTo, horizonDays, onHorizonChange],
+  );
+
   const activeSignals = mix > 0.5 ? afterSignals : beforeSignals;
   const hasBaseline = beforeSignals.length > 0;
 
@@ -132,7 +151,7 @@ export function DigitalTwinViewer({
       {/* Controls */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="readout">State</span>
+          <span className="readout">{t("twin.state")}</span>
           <div className="flex overflow-hidden rounded border" style={{ borderColor: "var(--line)" }}>
             <button
               onClick={() => animateTo(0)}
@@ -142,7 +161,7 @@ export function DigitalTwinViewer({
                 mix <= 0.5 ? "bg-signal/15 text-signal" : "text-ink-faint hover:text-ink"
               }`}
             >
-              Before
+              {t("twin.before")}
             </button>
             <button
               onClick={() => animateTo(1)}
@@ -151,13 +170,13 @@ export function DigitalTwinViewer({
                 mix > 0.5 ? "bg-signal/15 text-signal" : "text-ink-faint hover:text-ink"
               }`}
             >
-              After
+              {t("twin.after")}
             </button>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <span className="readout">Model</span>
+          <span className="readout">{t("twin.model")}</span>
           <div
             className="flex overflow-hidden rounded border"
             style={{ borderColor: "var(--line)" }}
@@ -171,19 +190,19 @@ export function DigitalTwinViewer({
                   model === option ? "bg-signal/15 text-signal" : "text-ink-faint hover:text-ink"
                 }`}
               >
-                {option}
+                {t(option === "male" ? "twin.male" : "twin.female")}
               </button>
             ))}
           </div>
           {model !== sex && (
             <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-state-amber">
-              Not the recorded sex
+              {t("twin.notRecordedSex")}
             </span>
           )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {!prefer2d && webglSupported && <span className="readout">View</span>}
+          {!prefer2d && webglSupported && <span className="readout">{t("twin.view")}</span>}
           {!prefer2d && webglSupported && VIEWS.map((item) => (
             <button
               key={item.id}
@@ -196,7 +215,7 @@ export function DigitalTwinViewer({
               }`}
               style={view === item.id ? undefined : { borderColor: "var(--line)" }}
             >
-              {item.label}
+              {t(item.label)}
             </button>
           ))}
           {webglSupported && (
@@ -216,7 +235,7 @@ export function DigitalTwinViewer({
             className="rounded border px-2.5 py-1 font-mono text-[11px] uppercase tracking-[0.12em] text-ink-faint transition hover:text-ink"
             style={{ borderColor: "var(--line)" }}
           >
-            {autoRotate ? "Pause spin" : "Auto-spin"}
+            {autoRotate ? t("twin.pauseSpin") : t("twin.autoSpin")}
           </button>
           )}
         </div>
@@ -230,7 +249,7 @@ export function DigitalTwinViewer({
       >
         {webglSupported && !prefer2d && (
           <div className="absolute right-4 top-4 z-10">
-            <ZoomControls api={zoomApi} zoom={zoom} onNavy />
+            <ZoomControls api={zoomApi} zoom={zoom} onNavy onReset={() => setView("front")} />
           </div>
         )}
         <div className="h-[520px] w-full sm:h-[640px] lg:h-[720px]">
@@ -271,16 +290,28 @@ export function DigitalTwinViewer({
           />
         )}
 
+        {horizons && horizons.length > 0 && (
+          <HorizonTimeline
+            horizons={horizons}
+            activeDays={horizonDays}
+            mix={mix}
+            onSelect={selectHorizon}
+          />
+        )}
+
         {/* Corner readout */}
         <div className="pointer-events-none absolute inset-x-4 top-4 flex items-start justify-between gap-3">
           <div className="flex flex-col gap-1">
-          <span className="readout">Digital twin</span>
+          <span className="readout">{t("twin.title")}</span>
           <span className="font-mono text-[11px] tabular-nums text-signal">
-            {mix > 0.5 ? "AFTER" : "BEFORE"} · {horizonDays}D HORIZON
+            {t("twin.horizonReadout", {
+              state: (mix > 0.5 ? t("twin.after") : t("twin.before")).toUpperCase(),
+              days: horizonDays,
+            })}
           </span>
           {(webglSupported === false || prefer2d) && (
             <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-faint">
-              {webglSupported === false ? "2D diagram · WebGL unavailable" : "2D diagram"}
+              {webglSupported === false ? t("twin.diagram2dNoWebgl") : t("twin.diagram2d")}
             </span>
           )}
           </div>
@@ -300,7 +331,7 @@ export function DigitalTwinViewer({
           className="flex items-center justify-between border-b px-3 py-2.5"
           style={{ borderColor: "var(--line)" }}
         >
-          <span className="readout">Organ readout</span>
+          <span className="readout">{t("twin.organReadout")}</span>
           <span className="font-mono text-[10px] tabular-nums text-ink-faint">
             {activeSignals.length}
           </span>
@@ -318,7 +349,7 @@ export function DigitalTwinViewer({
       {/* Morph slider */}
       {hasBaseline && (
         <div className="flex items-center gap-4">
-          <span className="readout shrink-0">Before</span>
+          <span className="readout shrink-0">{t("twin.before")}</span>
           <input
             type="range"
             className="morph w-full"
@@ -326,42 +357,20 @@ export function DigitalTwinViewer({
             max={100}
             value={Math.round(mix * 100)}
             onChange={(event) => setMix(Number(event.target.value) / 100)}
-            aria-label="Blend between the current state and the projected scenario"
-            aria-valuetext={`${Math.round(mix * 100)} percent towards the projected scenario`}
+            aria-label={t("twin.blendLabel")}
+            aria-valuetext={t("twin.blendValueText", { percent: Math.round(mix * 100) })}
           />
-          <span className="readout shrink-0">After</span>
+          <span className="readout shrink-0">{t("twin.after")}</span>
           <span className="w-12 shrink-0 text-right font-mono text-[11px] tabular-nums text-signal">
             {Math.round(mix * 100)}%
           </span>
         </div>
       )}
 
-      {/* Horizon */}
-      {horizons && onHorizonChange && (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="readout">Time horizon</span>
-          {horizons.map((days) => (
-            <button
-              key={days}
-              onClick={() => onHorizonChange(days)}
-              aria-pressed={horizonDays === days}
-              className={`rounded border px-3 py-1 font-mono text-[11px] tabular-nums transition ${
-                horizonDays === days
-                  ? "border-electric/50 bg-electric/10 text-electric"
-                  : "text-ink-faint hover:text-ink"
-              }`}
-              style={horizonDays === days ? undefined : { borderColor: "var(--line)" }}
-            >
-              {days >= 365 ? "1 year" : `${days} days`}
-            </button>
-          ))}
-        </div>
-      )}
-
       {/* Direction of change */}
       {delta && (
         <div className="panel flex items-center gap-3 p-3">
-          <span className="readout">Projected change</span>
+          <span className="readout">{t("twin.projectedChange")}</span>
           <span
             className="font-mono text-[11px] uppercase tracking-[0.12em]"
             style={{
@@ -374,10 +383,10 @@ export function DigitalTwinViewer({
             }}
           >
             {delta === "improves"
-              ? "↓ Overall risk lower than baseline"
+              ? t("twin.improves")
               : delta === "deteriorates"
-                ? "↑ Overall risk higher than baseline"
-                : "→ Overall risk unchanged"}
+                ? t("twin.deteriorates")
+                : t("twin.unchanged")}
           </span>
         </div>
       )}
@@ -386,7 +395,7 @@ export function DigitalTwinViewer({
 
       {/* Legend: measured vs inferred vs projected */}
       <div className="panel flex flex-wrap items-center gap-x-6 gap-y-2 p-4">
-        <span className="readout">Legend</span>
+        <span className="readout">{t("twin.legend")}</span>
         {(["green", "yellow", "red"] as RiskColor[]).map((color) => (
           <span key={color} className="flex items-center gap-2 text-xs text-ink-muted">
             <span
@@ -396,12 +405,12 @@ export function DigitalTwinViewer({
             >
               {STATE_GLYPH[color]}
             </span>
-            {STATE_LABEL[color]}
+            {t(STATE_LABEL_KEY[color])}
           </span>
         ))}
         <span className="flex items-center gap-2 text-xs text-ink-muted">
           <span aria-hidden className="inline-block h-4 w-4 rounded-full bg-[#224a63]" />
-          Not assessed in this scenario
+          {t("twin.notAssessedLegend")}
         </span>
       </div>
 
@@ -413,25 +422,24 @@ export function DigitalTwinViewer({
         >
           {analysisMeta.stale && (
             <span className="pulse-amber rounded border border-state-amber/40 bg-state-amber/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-state-amber">
-              △ Stale · patient data changed, recalculation required
+              {t("twin.stale")}
             </span>
           )}
           {analysisMeta.analyzedAt && (
-            <Meta label="Analyzed" value={new Date(analysisMeta.analyzedAt).toLocaleString()} />
+            <Meta label={t("twin.analyzed")} value={formatDateTime(analysisMeta.analyzedAt)} />
           )}
-          {analysisMeta.modelId && <Meta label="Model" value={analysisMeta.modelId} />}
+          {analysisMeta.modelId && <Meta label={t("twin.modelId")} value={analysisMeta.modelId} />}
           {analysisMeta.ruleSetVersion && (
-            <Meta label="Rule set" value={analysisMeta.ruleSetVersion} />
+            <Meta label={t("twin.ruleSet")} value={analysisMeta.ruleSetVersion} />
           )}
           {typeof analysisMeta.sourceRecordCount === "number" && (
-            <Meta label="Source records" value={String(analysisMeta.sourceRecordCount)} />
+            <Meta label={t("twin.sourceRecords")} value={String(analysisMeta.sourceRecordCount)} />
           )}
         </div>
       )}
 
       <p className="max-w-readable text-xs leading-relaxed text-ink-faint">
-        Measured values come from verified records. Projected values are an illustrative scenario
-        estimate over the selected horizon — a potential impact, not a confirmed outcome.
+        {t("twin.measuredNote")}
       </p>
     </div>
   );

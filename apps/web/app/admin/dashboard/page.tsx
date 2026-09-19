@@ -17,8 +17,9 @@ import {
 } from "@/components/ui/console";
 import { AnalysisTrend, type TrendPoint } from "@/components/charts/analysis-trend";
 import { api } from "@/lib/api-client";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, humanizeEnum } from "@/lib/format";
 import type { RiskColor } from "@/components/digital-twin/types";
+import { useI18n } from "@/lib/i18n";
 
 interface DashboardData {
   activeDoctors: number;
@@ -36,6 +37,7 @@ interface DashboardData {
 }
 
 export default function AdminDashboardPage() {
+  const { t } = useI18n();
   const { data, isLoading, isError } = useQuery({
     queryKey: ["admin-dashboard"],
     queryFn: () => api.get<DashboardData>("/admin/dashboard"),
@@ -56,30 +58,30 @@ export default function AdminDashboardPage() {
     () =>
       [...(data?.patientsByStatus ?? [])]
         .sort((a, b) => b.count - a.count)
-        .map((item) => ({ label: item._id, count: item.count })),
+        .map((item) => ({ label: humanizeEnum(item._id), count: item.count })),
     [data],
   );
 
   return (
     <AppShell role="ADMIN" navItems={ADMIN_NAV}>
       <PageHeader
-        eyebrow="Clinic console"
-        title="How the clinic is running"
-        description="Clinic-level activity only. Patient records stay with the treating doctor."
+        eyebrow={t("ad.eyebrow")}
+        title={t("ad.title")}
+        description={t("ad.description")}
         action={
           <Link
             href="/admin/doctors"
             className="rounded bg-electric px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-electric/90 hover:shadow-md"
           >
-            Manage doctors
+            {t("ad.manageDoctors")}
           </Link>
         }
         meta={
           data && (
             <>
-              <MetaItem label="Active doctors" value={String(data.activeDoctors)} />
-              <MetaItem label="Active patients" value={String(data.activePatients)} />
-              <MetaItem label="Updated" value={new Date().toLocaleTimeString()} />
+              <MetaItem label={t("ad.activeDoctors")} value={String(data.activeDoctors)} />
+              <MetaItem label={t("ad.activePatients")} value={String(data.activePatients)} />
+              <MetaItem label={t("ad.updated")} value={new Date().toLocaleTimeString()} />
             </>
           )
         }
@@ -88,8 +90,8 @@ export default function AdminDashboardPage() {
       {isError && (
         <div className="panel p-6">
           <EmptyState
-            title="The console could not load"
-            body="Check your connection and reload. No clinic data has changed."
+            title={t("ad.loadFailed")}
+            body={t("ad.loadFailedBody")}
           />
         </div>
       )}
@@ -106,25 +108,25 @@ export default function AdminDashboardPage() {
         <>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             <QueueCard
-              label="High-priority alerts"
+              label={t("ad.highPriorityAlerts")}
               count={data.highRiskAlerts}
-              hint="Analyses awaiting a doctor's decision"
+              hint={t("ad.highPriorityHint")}
               href="/admin/patients"
               tone="red"
               index={0}
             />
             <QueueCard
-              label="Active doctors"
+              label={t("ad.activeDoctors")}
               count={data.activeDoctors}
-              hint="Accounts able to sign in"
+              hint={t("ad.activeDoctorsHint")}
               href="/admin/doctors"
               kind="stat"
               index={1}
             />
             <QueueCard
-              label="Active patients"
+              label={t("ad.activePatients")}
               count={data.activePatients}
-              hint="Across the clinic"
+              hint={t("ad.activePatientsHint")}
               href="/admin/patients"
               kind="stat"
               index={2}
@@ -132,56 +134,53 @@ export default function AdminDashboardPage() {
           </div>
 
           <div className="mt-6 grid items-start gap-4 lg:grid-cols-[1fr_1fr]">
-            <Panel title="Patients by status">
+            <Panel title={t("ad.patientsByStatus")}>
               <DistributionBars items={statuses} />
               <p className="mt-5 border-t border-[color:var(--line)] pt-3 text-[12px] leading-relaxed text-ink-faint">
-                Incomplete patients are missing required fields; needs-review patients have AI
-                extraction a doctor has not confirmed.
+                {t("ad.patientsByStatusNote")}
               </p>
             </Panel>
 
-            <Panel title="Risk across recent analyses">
+            <Panel title={t("ad.riskAcross")}>
               <RiskRibbon counts={counts} />
               <p className="mt-5 border-t border-[color:var(--line)] pt-3 text-[12px] leading-relaxed text-ink-faint">
-                Counts only. Clinic admins see that an analysis happened, never its clinical
-                content.
+                {t("ad.riskAcrossNote")}
               </p>
             </Panel>
           </div>
 
           <div className="mt-4">
-            <Panel title="Analysis volume">
+            <Panel title={t("ad.analysisVolume")}>
               <AnalysisTrend data={trends ?? []} />
               <p className="mt-4 border-t border-[color:var(--line)] pt-3 text-[12px] leading-relaxed text-ink-faint">
-                Analyses run per day across the clinic, with the high-priority share drawn on top.
-                Volume only — no clinical content reaches this page.
+                {t("ad.analysisVolumeNote")}
               </p>
             </Panel>
           </div>
 
           <div className="mt-4">
             <Panel
-              title="Recent analyses"
+              title={t("ad.recentAnalyses")}
               action={
                 <Link
                   href="/admin/audit"
                   className="font-mono text-[11px] uppercase tracking-[0.12em] text-signal hover:underline"
                 >
-                  Audit log
+                  {t("ad.auditLog")}
                 </Link>
               }
             >
               {data.recentAnalyses.length === 0 ? (
                 <EmptyState
-                  title="No analyses yet"
-                  body="Once a doctor runs a treatment analysis, it is recorded here and in the audit log."
+                  title={t("ad.noAnalyses")}
+                  body={t("ad.noAnalysesBody")}
                 />
               ) : (
                 <div className="-mx-2 flex flex-col divide-y divide-[color:var(--line)]">
                   {data.recentAnalyses.map((analysis) => (
                     <Row
                       key={analysis._id}
-                      primary={analysis.patientName ?? analysis.patientCode ?? "Unnamed patient"}
+                      primary={analysis.patientName ?? analysis.patientCode ?? t("common.unnamedPatient")}
                       secondary={formatDateTime(analysis.createdAt)}
                       trailing={<RiskBadge color={analysis.overallRisk} quiet />}
                     />

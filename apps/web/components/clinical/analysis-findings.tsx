@@ -3,6 +3,8 @@
 import { ProvenanceChip } from "@/components/ui/provenance-chip";
 import { RiskBadge } from "@/components/ui/risk-badge";
 import { fieldLabel, fieldList } from "@/lib/format";
+import { useI18n } from "@/lib/i18n";
+import { ORGAN_BY_KEY, organLabelKey } from "@/components/digital-twin/anatomy";
 import type { OrganSignal } from "@/components/digital-twin/types";
 
 export interface AnalysisNarrative {
@@ -16,21 +18,6 @@ export interface AnalysisNarrative {
   modelId: string;
 }
 
-const ORGAN_LABELS: Record<string, string> = {
-  kidney: "Kidneys",
-  cardiovascular_system: "Cardiovascular system",
-  pancreas: "Pancreas",
-  liver: "Liver",
-  nervous_system: "Nervous system",
-  immune_system: "Immune system",
-  eyes: "Eyes",
-  blood_vessels: "Blood vessels",
-};
-
-function organLabel(organ: string): string {
-  return ORGAN_LABELS[organ] ?? organ.replace(/_/g, " ");
-}
-
 /**
  * What the rules found, in words, with the values they read. The twin shows
  * *where*; this shows *why*, and keeps the two things the spec insists on
@@ -38,6 +25,12 @@ function organLabel(organ: string): string {
  * paragraph underneath it.
  */
 export function AnalysisFindings({ analysis }: { analysis: AnalysisNarrative }) {
+  const { t } = useI18n();
+
+  /** Registry name where there is one, the raw key spaced out where there is not. */
+  const organLabel = (organ: string) =>
+    ORGAN_BY_KEY[organ] ? t(organLabelKey(organ)) : organ.replace(/_/g, " ");
+
   // One rule can raise a signal per organ; the explanation is what varies.
   const findings = Array.from(
     analysis.signals.reduce((map, signal) => {
@@ -60,8 +53,7 @@ export function AnalysisFindings({ analysis }: { analysis: AnalysisNarrative }) 
           className="rounded border border-state-amber/40 bg-state-amber/10 px-3 py-2.5 text-[13px] leading-relaxed text-state-amber"
         >
           <span aria-hidden>△ </span>
-          Analysis incomplete. Record {fieldList(analysis.missingData)} to complete it — the result
-          below is based only on what is on file.
+          {t("af.incomplete", { fields: fieldList(analysis.missingData) })}
         </p>
       )}
 
@@ -103,7 +95,7 @@ export function AnalysisFindings({ analysis }: { analysis: AnalysisNarrative }) 
 
               {signal.missingData && signal.missingData.length > 0 && (
                 <p className="mt-2.5 font-mono text-[11px] text-state-amber">
-                  Not on file: {fieldList(signal.missingData)}
+                  {t("af.notOnFile", { fields: fieldList(signal.missingData) })}
                 </p>
               )}
 
@@ -115,7 +107,7 @@ export function AnalysisFindings({ analysis }: { analysis: AnalysisNarrative }) 
 
               {signal.ruleCode && (
                 <p className="mt-2.5 font-mono text-[10px] uppercase tracking-[0.1em] text-ink-faint">
-                  {signal.ruleCode} · rule set {analysis.ruleSetVersion}
+                  {t("af.ruleSet", { code: signal.ruleCode, version: analysis.ruleSetVersion })}
                 </p>
               )}
             </li>
@@ -124,8 +116,7 @@ export function AnalysisFindings({ analysis }: { analysis: AnalysisNarrative }) 
       ) : (
         <p className="rounded border border-state-green/40 bg-state-green/10 px-3 py-2.5 text-[13px] text-state-green">
           <span aria-hidden>✓ </span>
-          No rule in catalog {analysis.ruleSetVersion} flagged this combination. That is not a
-          clearance — it means nothing in the reviewed catalog applies.
+          {t("af.noRule", { version: analysis.ruleSetVersion })}
         </p>
       )}
 
@@ -146,18 +137,17 @@ export function AnalysisFindings({ analysis }: { analysis: AnalysisNarrative }) 
             ) : (
               <span className="inline-flex items-center gap-1.5 rounded border border-[color:var(--line-strong)] px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-muted">
                 <span aria-hidden className="h-1 w-1 rounded-full bg-current" />
-                Rule summary · model unavailable
+                {t("af.ruleSummary")}
               </span>
             )}
             <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-ink-faint">
-              {analysis.aiAvailable ? analysis.modelId : "no model output"}
+              {analysis.aiAvailable ? analysis.modelId : t("af.noModelOutput")}
             </span>
           </div>
           <p className="mt-2.5 max-w-readable text-[13px] leading-relaxed text-ink">{analysis.aiNarrative}</p>
           {!analysis.aiAvailable && (
             <p className="mt-2 text-[12px] leading-relaxed text-ink-faint">
-              The model could not be reached, so this paragraph only restates the rule findings
-              above. Nothing was generated.
+              {t("af.modelUnavailable")}
             </p>
           )}
         </div>

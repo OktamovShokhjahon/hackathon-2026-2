@@ -7,6 +7,8 @@ import { api, ApiError } from "@/lib/api-client";
 import { useToast } from "@/components/ui/toast";
 import { inputClass } from "@/components/ui/modal";
 import { formatDateTime, humanizeEnum } from "@/lib/format";
+import { useI18n } from "@/lib/i18n";
+import type { MessageKey } from "@/lib/locales/uz";
 
 export type Decision = "APPROVED" | "REJECTED" | "DISCONTINUED";
 
@@ -23,13 +25,13 @@ export interface ReviewableScenario {
   };
 }
 
-const DECISIONS: Array<{ value: Decision; label: string; hint: string; tone: string }> = [
-  { value: "APPROVED", label: "Approve", hint: "This plan goes ahead as analyzed.", tone: "var(--state-green)" },
-  { value: "REJECTED", label: "Reject", hint: "This plan is not going ahead.", tone: "var(--state-red)" },
+const DECISIONS: Array<{ value: Decision; label: MessageKey; hint: MessageKey; tone: string }> = [
+  { value: "APPROVED", label: "sr.approve", hint: "sr.approveHint", tone: "var(--state-green)" },
+  { value: "REJECTED", label: "sr.reject", hint: "sr.rejectHint", tone: "var(--state-red)" },
   {
     value: "DISCONTINUED",
-    label: "Discontinue",
-    hint: "A plan already in use is being stopped.",
+    label: "sr.discontinue",
+    hint: "sr.discontinueHint",
     tone: "var(--state-amber)",
   },
 ];
@@ -50,6 +52,7 @@ export function ScenarioReview({
 }) {
   const queryClient = useQueryClient();
   const toast = useToast();
+  const { t } = useI18n();
   const [decision, setDecision] = useState<Decision | null>(null);
   const [note, setNote] = useState("");
   const [visibleToPatient, setVisibleToPatient] = useState(false);
@@ -65,24 +68,24 @@ export function ScenarioReview({
     onSuccess: () => {
       toast(
         decision === "APPROVED" && visibleToPatient
-          ? "Decision recorded and published to the patient"
-          : "Decision recorded"
+          ? t("sr.recordedPublished")
+          : t("sr.recorded")
       );
       setDecision(null);
       setNote("");
       setError(null);
       queryClient.invalidateQueries({ queryKey: ["scenarios", patientId] });
     },
-    onError: (err) => setError(err instanceof ApiError ? err.message : "The decision could not be saved"),
+    onError: (err) => setError(err instanceof ApiError ? err.message : t("sr.saveFailed")),
   });
 
   const recalculate = useMutation({
     mutationFn: () => api.post(`/treatment-scenarios/${scenario._id}/recalculate`),
     onSuccess: () => {
-      toast("Re-ran the analysis against the current records");
+      toast(t("sr.reran"));
       queryClient.invalidateQueries({ queryKey: ["scenarios", patientId] });
     },
-    onError: (err) => setError(err instanceof ApiError ? err.message : "The analysis could not be re-run"),
+    onError: (err) => setError(err instanceof ApiError ? err.message : t("sr.rerunFailed")),
   });
 
   // Mongoose materialises the nested `doctorReview` object because one of its
@@ -99,11 +102,10 @@ export function ScenarioReview({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 id="decision-heading" className="readout">
-            Clinical decision
+            {t("sr.heading")}
           </h3>
           <p className="mt-1.5 max-w-readable text-[13px] leading-relaxed text-ink-muted">
-            The analysis is decision support. Record what you decided, and choose separately whether
-            the patient should see this scenario.
+            {t("sr.intro")}
           </p>
         </div>
         <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-faint">
@@ -115,14 +117,14 @@ export function ScenarioReview({
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded border border-state-amber/40 bg-state-amber/10 px-3 py-2.5">
           <p className="text-[13px] text-state-amber">
             <span aria-hidden>△ </span>
-            The patient&rsquo;s records changed after this analysis ran, so it is out of date.
+            {t("sr.outOfDate")}
           </p>
           <button
             onClick={() => recalculate.mutate()}
             disabled={recalculate.isPending}
             className="rounded border border-state-amber/50 px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.1em] text-state-amber transition hover:bg-state-amber/10 disabled:opacity-60"
           >
-            {recalculate.isPending ? "Re-running…" : "Re-run analysis"}
+            {recalculate.isPending ? t("sr.rerunning") : t("sr.rerun")}
           </button>
         </div>
       )}
@@ -151,7 +153,7 @@ export function ScenarioReview({
               className="font-mono text-[10px] uppercase tracking-[0.1em]"
               style={{ color: reviewed.visibleToPatient ? "var(--signal)" : "var(--ink-faint)" }}
             >
-              {reviewed.visibleToPatient ? "· Visible to patient" : "· Not shared with patient"}
+              {reviewed.visibleToPatient ? t("sr.visible") : t("sr.notShared")}
             </span>
           </div>
           {reviewed.note && <p className="mt-2.5 text-[13px] leading-relaxed text-ink">{reviewed.note}</p>}
@@ -163,7 +165,7 @@ export function ScenarioReview({
             }}
             className="mt-3 font-mono text-[11px] uppercase tracking-[0.12em] text-signal hover:underline"
           >
-            Revise this decision
+            {t("sr.revise")}
           </button>
         </motion.div>
       ) : null}
@@ -177,7 +179,7 @@ export function ScenarioReview({
           className="mt-4 flex flex-col gap-4"
         >
           <fieldset>
-            <legend className="readout mb-2">Decision</legend>
+            <legend className="readout mb-2">{t("sr.decision")}</legend>
             <div className="flex flex-wrap gap-2">
               {DECISIONS.map((option) => {
                 const active = decision === option.value;
@@ -195,8 +197,8 @@ export function ScenarioReview({
                       boxShadow: active ? `inset 0 0 0 1px ${option.tone}` : undefined,
                     }}
                   >
-                    <span className="block font-medium">{option.label}</span>
-                    <span className="mt-0.5 block text-[11px] text-ink-faint">{option.hint}</span>
+                    <span className="block font-medium">{t(option.label)}</span>
+                    <span className="mt-0.5 block text-[11px] text-ink-faint">{t(option.hint)}</span>
                   </button>
                 );
               })}
@@ -204,12 +206,12 @@ export function ScenarioReview({
           </fieldset>
 
           <label className="flex flex-col gap-1.5">
-            <span className="readout">Clinical note</span>
+            <span className="readout">{t("sr.clinicalNote")}</span>
             <textarea
               rows={3}
               value={note}
               onChange={(event) => setNote(event.target.value)}
-              placeholder="What you decided and why, and the follow-up plan."
+              placeholder={t("sr.notePlaceholder")}
               className={`${inputClass} resize-y`}
             />
           </label>
@@ -223,10 +225,9 @@ export function ScenarioReview({
                 onChange={(event) => setVisibleToPatient(event.target.checked)}
               />
               <span className="text-[13px] leading-relaxed text-ink">
-                Publish this scenario to the patient
+                {t("sr.publish")}
                 <span className="mt-0.5 block text-[12px] text-ink-faint">
-                  They will see the organ states and the time horizons, labelled as an illustrative
-                  projection. Your clinical note stays private.
+                  {t("sr.publishHint")}
                 </span>
               </span>
             </label>
@@ -244,7 +245,7 @@ export function ScenarioReview({
               disabled={!decision || review.isPending}
               className="rounded bg-electric px-4 py-2 text-sm font-medium text-white transition hover:bg-electric/90 disabled:opacity-50"
             >
-              {review.isPending ? "Saving…" : "Record decision"}
+              {review.isPending ? t("action.saving") : t("sr.recordDecision")}
             </button>
             {reviewed && (
               <button
@@ -252,7 +253,7 @@ export function ScenarioReview({
                 onClick={() => setDecision(null)}
                 className="font-mono text-[11px] uppercase tracking-[0.12em] text-ink-faint hover:text-ink"
               >
-                Cancel
+                {t("common.cancel")}
               </button>
             )}
           </div>

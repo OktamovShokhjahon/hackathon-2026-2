@@ -247,7 +247,7 @@ export default function PatientDetailPage() {
     <AppShell role="DOCTOR" navItems={DOCTOR_NAV} crumbOverride={patient?.user.fullName}>
       <PageHeader
         eyebrow={t("chart.eyebrow")}
-        title={patient?.user.fullName ?? "Patient"}
+        title={patient?.user.fullName ?? t("chart.patientFallback")}
         meta={
           patient && (
             <>
@@ -599,8 +599,8 @@ export default function PatientDetailPage() {
       <Modal
         open={diagnosisOpen}
         onClose={() => setDiagnosisOpen(false)}
-        title="Add a diagnosis"
-        description="It is expanded into clinical context you review before anything counts."
+        title={t("chart.addDiagnosis")}
+        description={t("chart.addDiagnosisDesc")}
         footer={
           <>
             <button
@@ -608,7 +608,7 @@ export default function PatientDetailPage() {
               onClick={() => setDiagnosisOpen(false)}
               className="rounded border border-[color:var(--line-strong)] px-4 py-2 text-sm text-ink transition hover:bg-ink/[0.04]"
             >
-              Cancel
+              {t("common.cancel")}
             </button>
             <button
               type="submit"
@@ -616,7 +616,7 @@ export default function PatientDetailPage() {
               disabled={addDiagnosis.isPending}
               className="rounded bg-electric px-4 py-2 text-sm font-medium text-white transition hover:bg-electric/90 disabled:opacity-60"
             >
-              {addDiagnosis.isPending ? "Adding…" : "Add diagnosis"}
+              {addDiagnosis.isPending ? t("chart.addingDiagnosis") : t("chart.addDiagnosisCta")}
             </button>
           </>
         }
@@ -629,16 +629,16 @@ export default function PatientDetailPage() {
           }}
           className="flex flex-col gap-4"
         >
-          <Field label="Diagnosis">
+          <Field label={t("chart.diagnosisLabel")}>
             <input
-              placeholder="e.g. Type 2 diabetes mellitus"
+              placeholder={t("chart.diagnosisPlaceholder")}
               required
               value={diagnosisForm.label}
               onChange={(e) => setDiagnosisForm((f) => ({ ...f, label: e.target.value }))}
               className={inputClass}
             />
           </Field>
-          <Field label="Diagnosed on">
+          <Field label={t("chart.diagnosedOn")}>
             <input
               type="date"
               value={diagnosisForm.diagnosedAt}
@@ -652,8 +652,8 @@ export default function PatientDetailPage() {
       <Modal
         open={medicationOpen}
         onClose={() => setMedicationOpen(false)}
-        title="Add a medication"
-        description="Look up the label before you prescribe — the reference opens from the chart."
+        title={t("chart.addMedication")}
+        description={t("chart.addMedicationDesc")}
         footer={
           <>
             <button
@@ -661,7 +661,7 @@ export default function PatientDetailPage() {
               onClick={() => setMedicationOpen(false)}
               className="rounded border border-[color:var(--line-strong)] px-4 py-2 text-sm text-ink transition hover:bg-ink/[0.04]"
             >
-              Cancel
+              {t("common.cancel")}
             </button>
             <button
               type="submit"
@@ -669,7 +669,7 @@ export default function PatientDetailPage() {
               disabled={addMedication.isPending}
               className="rounded bg-electric px-4 py-2 text-sm font-medium text-white transition hover:bg-electric/90 disabled:opacity-60"
             >
-              {addMedication.isPending ? "Adding…" : "Add medication"}
+              {addMedication.isPending ? t("chart.addingDiagnosis") : t("chart.addMedicationCta")}
             </button>
           </>
         }
@@ -682,9 +682,9 @@ export default function PatientDetailPage() {
           }}
           className="flex flex-col gap-4"
         >
-          <Field label="Medicine">
+          <Field label={t("chart.medicine")}>
             <input
-              placeholder="e.g. Metformin"
+              placeholder={t("chart.medicinePlaceholder")}
               required
               value={medicationForm.genericName}
               onChange={(e) => setMedicationForm((f) => ({ ...f, genericName: e.target.value }))}
@@ -692,7 +692,7 @@ export default function PatientDetailPage() {
             />
           </Field>
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Dose">
+            <Field label={t("chart.dose")}>
               <input
                 type="number"
                 required
@@ -701,7 +701,7 @@ export default function PatientDetailPage() {
                 className={inputClass}
               />
             </Field>
-            <Field label="Unit">
+            <Field label={t("chart.unit")}>
               <input
                 value={medicationForm.unit}
                 onChange={(e) => setMedicationForm((f) => ({ ...f, unit: e.target.value }))}
@@ -709,7 +709,7 @@ export default function PatientDetailPage() {
               />
             </Field>
           </div>
-          <Field label="Frequency">
+          <Field label={t("chart.frequency")}>
             <input
               value={medicationForm.frequency}
               onChange={(e) => setMedicationForm((f) => ({ ...f, frequency: e.target.value }))}
@@ -722,7 +722,7 @@ export default function PatientDetailPage() {
             onClick={() => setReferenceFor(medicationForm.genericName.trim())}
             className="self-start font-mono text-[11px] uppercase tracking-[0.12em] text-signal hover:underline disabled:text-ink-faint disabled:no-underline"
           >
-            Look up this medicine first
+            {t("chart.lookUpFirst")}
           </button>
         </form>
       </Modal>

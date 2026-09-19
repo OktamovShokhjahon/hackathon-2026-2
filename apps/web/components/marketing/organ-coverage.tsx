@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { ORGANS } from "@/components/digital-twin/anatomy";
+import { ORGANS, organLabelKey, systemLabelKey } from "@/components/digital-twin/anatomy";
 import { BodyDiagram } from "@/components/digital-twin/body-diagram";
 import type { OrganSignal } from "@/components/digital-twin/types";
+import { useI18n } from "@/lib/i18n";
 
 /**
  * Organ coverage. Hovering a system lights it on the body plate, which is the
@@ -13,6 +14,7 @@ import type { OrganSignal } from "@/components/digital-twin/types";
  */
 export function OrganCoverage() {
   const [active, setActive] = useState<string | null>(null);
+  const { t } = useI18n();
 
   // The plate is an atlas here, not a risk readout: everything reads neutral
   // until you point at it.
@@ -42,7 +44,7 @@ export function OrganCoverage() {
           {[...bySystem.entries()].map(([system, organs]) => (
             <li key={system} className="bg-surface">
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 p-4">
-                <span className="readout w-full">{system}</span>
+                <span className="readout w-full">{t(systemLabelKey(system))}</span>
                 {organs.map((organ) => (
                   <button
                     key={organ.key}
@@ -54,7 +56,7 @@ export function OrganCoverage() {
                       active === organ.key ? "bg-signal/10 text-signal" : "text-ink hover:text-signal"
                     }`}
                   >
-                    {organ.label}
+                    {t(organLabelKey(organ.key))}
                   </button>
                 ))}
               </div>
@@ -62,8 +64,7 @@ export function OrganCoverage() {
           ))}
         </ul>
         <p className="mt-4 max-w-readable text-[13px] leading-relaxed text-ink-faint">
-          Coverage follows the reviewed clinical rule catalog. An organ appears on the twin only
-          when a rule or a verified record has something to say about it.
+          {t("home.organsFootnote")}
         </p>
       </div>
 

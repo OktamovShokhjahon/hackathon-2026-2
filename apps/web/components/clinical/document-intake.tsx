@@ -9,6 +9,8 @@ import { inputClass } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { api, ApiError } from "@/lib/api-client";
 import { formatDate, formatRelative, humanizeEnum } from "@/lib/format";
+import { useI18n } from "@/lib/i18n";
+import type { MessageKey } from "@/lib/locales/uz";
 
 interface DocumentRow {
   _id: string;
@@ -30,12 +32,12 @@ interface CandidateRecord {
   sourceReferences?: Array<{ span?: string }>;
 }
 
-const EXTRACTION_LABEL: Record<string, string> = {
-  pdf_text_layer: "Read from the PDF text layer",
-  docx: "Read from the Word document",
-  plain_text: "Read as plain text",
-  pasted: "Pasted by a clinician",
-  none: "No readable text",
+const EXTRACTION_LABEL: Record<string, MessageKey> = {
+  pdf_text_layer: "di.extract.pdf_text_layer",
+  docx: "di.extract.docx",
+  plain_text: "di.extract.plain_text",
+  pasted: "di.extract.pasted",
+  none: "di.extract.none",
 };
 
 /**
@@ -48,6 +50,7 @@ const EXTRACTION_LABEL: Record<string, string> = {
 export function DocumentIntake({ patientId }: { patientId: string }) {
   const queryClient = useQueryClient();
   const toast = useToast();
+  const { t } = useI18n();
   const fileInput = useRef<HTMLInputElement>(null);
   const [pastedText, setPastedText] = useState("");
   const [activeDocumentId, setActiveDocumentId] = useState<string | null>(null);
@@ -78,14 +81,14 @@ export function DocumentIntake({ patientId }: { patientId: string }) {
       setPastedText("");
       toast(
         result.createdRecordIds.length > 0
-          ? `${result.createdRecordIds.length} candidate facts need your review`
-          : "No candidate facts were found in this document",
+          ? t("di.candidates", { count: result.createdRecordIds.length })
+          : t("di.noCandidates"),
         result.createdRecordIds.length > 0 ? "success" : "info",
       );
       queryClient.invalidateQueries({ queryKey: ["records", patientId] });
       queryClient.invalidateQueries({ queryKey: ["documents", patientId] });
     },
-    onError: (err) => setError(err instanceof ApiError ? err.message : "The document could not be analyzed"),
+    onError: (err) => setError(err instanceof ApiError ? err.message : t("di.analyzeFailed")),
   });
 
   const upload = useMutation({
@@ -98,26 +101,26 @@ export function DocumentIntake({ patientId }: { patientId: string }) {
         // Text was read from the file, so the extraction can run straight away.
         analyze.mutate({ documentId: document._id });
       } else {
-        toast(document.extractionNote ?? "Paste the text from this document to analyze it", "info");
+        toast(document.extractionNote ?? t("di.pasteToAnalyze"), "info");
       }
     },
-    onError: (err) => setError(err instanceof ApiError ? err.message : "The document could not be uploaded"),
+    onError: (err) => setError(err instanceof ApiError ? err.message : t("di.uploadFailed")),
   });
 
   const verify = useMutation({
     mutationFn: (params: { recordId: string; approve: boolean }) =>
       api.patch(`/records/${params.recordId}`, { approve: params.approve }),
     onSuccess: (_result, params) => {
-      toast(params.approve ? "Added to the verified history" : "Rejected — kept out of the snapshot");
+      toast(params.approve ? t("di.approved") : t("di.rejected"));
       queryClient.invalidateQueries({ queryKey: ["records", patientId] });
       queryClient.invalidateQueries({ queryKey: ["scenarios", patientId] });
     },
-    onError: (err) => setError(err instanceof ApiError ? err.message : "The record could not be updated"),
+    onError: (err) => setError(err instanceof ApiError ? err.message : t("di.updateFailed")),
   });
 
   return (
     <Panel
-      title={`Documents${pending.length > 0 ? ` · ${pending.length} to verify` : ""}`}
+      title={`${t("di.title")}${pending.length > 0 ? t("di.toVerify", { count: pending.length }) : ""}`}
       className="mt-4"
       action={
         <button
@@ -126,7 +129,7 @@ export function DocumentIntake({ patientId }: { patientId: string }) {
           disabled={upload.isPending}
           className="rounded border border-[color:var(--line-strong)] px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.1em] text-ink transition hover:bg-ink/[0.04] disabled:opacity-60"
         >
-          {upload.isPending ? "Uploading…" : "Upload file"}
+          {upload.isPending ? t("di.uploading") : t("di.uploadFile")}
         </button>
       }
     >
@@ -143,8 +146,7 @@ export function DocumentIntake({ patientId }: { patientId: string }) {
       />
 
       <p className="max-w-readable text-[13px] leading-relaxed text-ink-muted">
-        PDF and Word files are read automatically. A scan or a photo has no text to read, so paste
-        its text instead. Everything extracted waits for your approval before it counts.
+        {t("di.intro")}
       </p>
 
       {/* ------------------------------------------------------ paste path */}
@@ -153,7 +155,7 @@ export function DocumentIntake({ patientId }: { patientId: string }) {
           event.preventDefault();
           const documentId = activeDocumentId ?? documents?.[0]?._id;
           if (!documentId) {
-            setError("Upload the source file first, then paste its text here.");
+            setError(t("di.uploadFirst"));
             return;
           }
           analyze.mutate({ documentId, text: pastedText });
@@ -161,12 +163,12 @@ export function DocumentIntake({ patientId }: { patientId: string }) {
         className="mt-4 flex flex-col gap-2"
       >
         <label className="flex flex-col gap-1.5">
-          <span className="readout">Paste document text</span>
+          <span className="readout">{t("di.pasteLabel")}</span>
           <textarea
             rows={3}
             value={pastedText}
             onChange={(event) => setPastedText(event.target.value)}
-            placeholder="Paste a lab report, discharge summary or prescription here."
+            placeholder={t("di.pastePlaceholder")}
             className={`${inputClass} resize-y font-mono text-[12px]`}
           />
         </label>
@@ -176,10 +178,14 @@ export function DocumentIntake({ patientId }: { patientId: string }) {
             disabled={pastedText.trim().length < 10 || analyze.isPending}
             className="rounded bg-ai px-4 py-2 text-sm font-medium text-white transition hover:bg-ai/90 disabled:opacity-50"
           >
-            {analyze.isPending ? "Extracting…" : "Extract facts"}
+            {analyze.isPending ? t("di.extracting") : t("di.extractFacts")}
           </button>
           <span className="text-[12px] text-ink-faint">
-            Attaches to {activeDocumentId ? "the document you just uploaded" : documents?.[0]?.fileName ?? "an uploaded file"}
+            {t("di.attachesTo", {
+              target: activeDocumentId
+                ? t("di.justUploaded")
+                : documents?.[0]?.fileName ?? t("di.anUploadedFile"),
+            })}
           </span>
         </div>
       </form>
@@ -192,14 +198,13 @@ export function DocumentIntake({ patientId }: { patientId: string }) {
 
       {extractionSource === "deterministic_parser" && (
         <p className="mt-3 rounded border border-[color:var(--line-strong)] bg-sunken px-3 py-2 text-[12px] leading-relaxed text-ink-muted">
-          The model was unavailable. A literal parser read the values it recognises and quoted the
-          line each one came from — nothing was generated, and everything still needs your approval.
+          {t("di.deterministic")}
         </p>
       )}
 
       {/* ----------------------------------------------- verification queue */}
       <div className="mt-5">
-        <h3 className="readout mb-2">Awaiting verification</h3>
+        <h3 className="readout mb-2">{t("di.awaitingVerification")}</h3>
         <AnimatePresence initial={false}>
           {pending.length > 0 ? (
             <ul className="flex flex-col gap-2">
@@ -226,7 +231,9 @@ export function DocumentIntake({ patientId }: { patientId: string }) {
                       </p>
                       <p className="mt-0.5 font-mono text-[11px] text-ink-faint">
                         {humanizeEnum(record.type)} · {formatDate(record.eventDate)}
-                        {record.data.confidence ? ` · confidence ${record.data.confidence}` : ""}
+                        {record.data.confidence
+                          ? t("di.confidence", { level: record.data.confidence })
+                          : ""}
                       </p>
                     </div>
                     <ProvenanceChip grade="ai_unverified" />
@@ -244,14 +251,14 @@ export function DocumentIntake({ patientId }: { patientId: string }) {
                       disabled={verify.isPending}
                       className="rounded border border-state-green/50 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.1em] text-state-green transition hover:bg-state-green/10 disabled:opacity-60"
                     >
-                      Approve
+                      {t("action.approve")}
                     </button>
                     <button
                       onClick={() => verify.mutate({ recordId: record._id, approve: false })}
                       disabled={verify.isPending}
                       className="rounded border border-[color:var(--line-strong)] px-3 py-1 font-mono text-[10px] uppercase tracking-[0.1em] text-ink-muted transition hover:bg-ink/[0.04] disabled:opacity-60"
                     >
-                      Reject
+                      {t("action.reject")}
                     </button>
                   </div>
                 </motion.li>
@@ -259,8 +266,8 @@ export function DocumentIntake({ patientId }: { patientId: string }) {
             </ul>
           ) : (
             <EmptyState
-              title="Nothing waiting"
-              body="Extracted facts appear here for approval before they enter the verified history."
+              title={t("di.nothingWaiting")}
+              body={t("di.nothingWaitingBody")}
             />
           )}
         </AnimatePresence>
@@ -268,7 +275,7 @@ export function DocumentIntake({ patientId }: { patientId: string }) {
 
       {/* --------------------------------------------------------- file list */}
       <div className="mt-5">
-        <h3 className="readout mb-2">Uploaded files</h3>
+        <h3 className="readout mb-2">{t("di.uploadedFiles")}</h3>
         {documentsLoading ? (
           <Skeleton rows={2} />
         ) : documents && documents.length > 0 ? (
@@ -279,7 +286,7 @@ export function DocumentIntake({ patientId }: { patientId: string }) {
                   <p className="truncate text-[13px] text-ink">{document.fileName}</p>
                   <p className="mt-0.5 font-mono text-[11px] text-ink-faint">
                     {Math.max(1, Math.round(document.sizeBytes / 1024))} KB · {formatRelative(document.createdAt)}
-                    {document.extractionMethod ? ` · ${EXTRACTION_LABEL[document.extractionMethod]}` : ""}
+                    {document.extractionMethod ? ` · ${t(EXTRACTION_LABEL[document.extractionMethod])}` : ""}
                   </p>
                 </div>
                 <button
@@ -290,13 +297,13 @@ export function DocumentIntake({ patientId }: { patientId: string }) {
                   disabled={analyze.isPending}
                   className="shrink-0 font-mono text-[10px] uppercase tracking-[0.1em] text-signal hover:underline disabled:text-ink-faint"
                 >
-                  {document.analyzedAt ? "Re-extract" : "Extract facts"}
+                  {document.analyzedAt ? t("di.reExtract") : t("di.extractFacts")}
                 </button>
               </li>
             ))}
           </ul>
         ) : (
-          <EmptyState title="No documents yet" body="Upload a lab report or a discharge summary to start." />
+          <EmptyState title={t("di.noDocuments")} body={t("di.noDocumentsBody")} />
         )}
       </div>
     </Panel>

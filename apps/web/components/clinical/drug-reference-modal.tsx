@@ -5,6 +5,8 @@ import { Modal } from "@/components/ui/modal";
 import { EmptyState, Skeleton } from "@/components/ui/console";
 import { ProvenanceChip } from "@/components/ui/provenance-chip";
 import { api } from "@/lib/api-client";
+import { useI18n } from "@/lib/i18n";
+import { formatDate } from "@/lib/format";
 
 interface DrugReference {
   query: string;
@@ -37,6 +39,7 @@ export function DrugReferenceModal({
   open: boolean;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   const { data, isLoading, isError } = useQuery({
     queryKey: ["drug-reference", name.toLowerCase()],
     queryFn: () => api.get<DrugReference>(`/drug-reference?name=${encodeURIComponent(name)}`),
@@ -49,15 +52,15 @@ export function DrugReferenceModal({
       open={open}
       onClose={onClose}
       size="lg"
-      title={`Reference · ${name}`}
-      description="Retrieved from public medicines databases. Check it against your own formulary before prescribing."
+      title={t("drug.title", { name })}
+      description={t("drug.description")}
       footer={
         <button
           type="button"
           onClick={onClose}
           className="rounded border border-[color:var(--line)] px-4 py-2 text-sm text-ink transition hover:bg-ink/[0.04]"
         >
-          Close
+          {t("action.close")}
         </button>
       }
     >
@@ -65,14 +68,14 @@ export function DrugReferenceModal({
 
       {isError && (
         <EmptyState
-          title="The lookup did not complete"
-          body="The medicines database could not be reached. Try again, or use your own formulary."
+          title={t("drug.lookupFailed")}
+          body={t("drug.lookupFailedBody")}
         />
       )}
 
       {data && !data.found && (
         <EmptyState
-          title="No label found for this name"
+          title={t("drug.noLabel")}
           body={data.notice}
         />
       )}
@@ -82,8 +85,8 @@ export function DrugReferenceModal({
           <div className="flex flex-wrap items-center gap-2">
             <ProvenanceChip grade="verified" />
             <span className="readout">
-              Retrieved {new Date(data.fetchedAt).toLocaleDateString()}
-              {data.cached ? " · cached" : ""}
+              {t("drug.retrieved", { date: formatDate(data.fetchedAt) })}
+              {data.cached ? t("drug.cached") : ""}
             </span>
           </div>
 
@@ -102,19 +105,19 @@ export function DrugReferenceModal({
             <div className="flex flex-wrap gap-x-6 gap-y-2">
               {data.genericName && (
                 <span className="flex flex-col">
-                  <span className="readout">Generic name</span>
+                  <span className="readout">{t("drug.genericName")}</span>
                   <span className="text-[14px] text-ink">{data.genericName}</span>
                 </span>
               )}
               {data.brandNames.length > 0 && (
                 <span className="flex min-w-0 flex-col">
-                  <span className="readout">Brand names</span>
+                  <span className="readout">{t("drug.brandNames")}</span>
                   <span className="text-[14px] text-ink">{data.brandNames.join(", ")}</span>
                 </span>
               )}
               {data.rxcui && (
                 <span className="flex flex-col">
-                  <span className="readout">RxCUI</span>
+                  <span className="readout">{t("drug.rxcui")}</span>
                   <span className="font-mono text-[13px] tabular-nums text-ink">{data.rxcui}</span>
                 </span>
               )}
@@ -127,14 +130,14 @@ export function DrugReferenceModal({
               style={{ borderColor: "var(--line)", background: "var(--sunken)" }}
             >
               <div className="mb-2 flex items-center gap-2">
-                <span className="readout">In short</span>
+                <span className="readout">{t("drug.inShort")}</span>
                 <ProvenanceChip grade="ai_interpretation" />
               </div>
               <p className="whitespace-pre-line text-[13px] leading-relaxed text-ink-muted">
                 {data.plainSummary}
               </p>
               <p className="mt-3 text-[11px] leading-relaxed text-ink-faint">
-                Condensed from the label text below. Nothing was added to it.
+                {t("drug.condensed")}
               </p>
             </section>
           )}
@@ -149,7 +152,7 @@ export function DrugReferenceModal({
           </div>
 
           <footer className="border-t border-[color:var(--line)] pt-3">
-            <span className="readout">Sources</span>
+            <span className="readout">{t("drug.sources")}</span>
             <ul className="mt-2 flex flex-col gap-1.5">
               {data.sources.map((source) => (
                 <li key={source.url}>

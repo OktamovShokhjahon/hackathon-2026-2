@@ -87,7 +87,7 @@ export function AppShell({
   if (!hydrated) {
     return (
       <div className="flex min-h-screen items-center justify-center" role="status">
-        <span className="readout animate-pulse">Loading workspace</span>
+        <span className="readout animate-pulse">{t("shell.loading")}</span>
       </div>
     );
   }
@@ -95,7 +95,7 @@ export function AppShell({
   if (!user || user.role !== role) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <span className="readout">Redirecting to sign in</span>
+        <span className="readout">{t("shell.redirecting")}</span>
       </div>
     );
   }
@@ -106,7 +106,7 @@ export function AppShell({
   );
 
   const nav = (
-    <nav className="flex flex-1 flex-col gap-0.5" aria-label="Primary">
+    <nav className="flex flex-1 flex-col gap-0.5" aria-label={t("nav.primary")}>
       {navItems.map((item) => {
         const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
         return (

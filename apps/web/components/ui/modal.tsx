@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { useI18n } from "@/lib/i18n";
 
 /**
  * Dialog used for the short create flows. It traps focus, restores it on close,
@@ -26,6 +27,7 @@ export function Modal({
   footer?: ReactNode;
   size?: "md" | "lg";
 }) {
+  const { t } = useI18n();
   const panelRef = useRef<HTMLDivElement>(null);
   const restoreFocusTo = useRef<HTMLElement | null>(null);
   const titleId = useId();
@@ -138,7 +140,7 @@ export function Modal({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t("action.close")}
             className="shrink-0 rounded px-2 py-1 font-mono text-[13px] text-ink-faint transition hover:bg-ink/[0.05] hover:text-ink"
           >
             ✕

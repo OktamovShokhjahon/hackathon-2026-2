@@ -8,6 +8,7 @@ import { inputClass } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { api } from "@/lib/api-client";
 import { formatDateTime, humanizeAuditAction, humanizeEnum } from "@/lib/format";
+import { useI18n } from "@/lib/i18n";
 
 interface AuditRow {
   _id: string;
@@ -46,6 +47,7 @@ function toCsv(rows: AuditRow[]): string {
 
 export default function AdminAuditPage() {
   const toast = useToast();
+  const { t } = useI18n();
   const [search, setSearch] = useState("");
   const [role, setRole] = useState<(typeof ROLE_FILTERS)[number]>("ALL");
 
@@ -73,30 +75,30 @@ export default function AdminAuditPage() {
     link.download = `twinrx-audit-${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
     URL.revokeObjectURL(url);
-    toast(`Exported ${rows.length} audit events`);
+    toast(t("au.exported", { count: rows.length }));
   }
 
   return (
     <AppShell role="ADMIN" navItems={ADMIN_NAV}>
       <PageHeader
-        eyebrow="Compliance"
-        title="Audit log"
-        description="Append-only. Events cannot be edited or deleted from this interface — they can only be read and exported."
+        eyebrow={t("au.eyebrow")}
+        title={t("au.title")}
+        description={t("au.description")}
         action={
           <button
             onClick={exportCsv}
             disabled={rows.length === 0}
             className="rounded border border-[color:var(--line-strong)] px-4 py-2 text-sm text-ink transition hover:bg-ink/[0.04] disabled:opacity-50"
           >
-            Export CSV
+            {t("au.exportCsv")}
           </button>
         }
         meta={
           data && (
             <>
-              <MetaItem label="Events held" value={String(data.length)} />
-              <MetaItem label="Shown" value={String(rows.length)} />
-              <MetaItem label="Retention" value="Append-only" />
+              <MetaItem label={t("au.eventsHeld")} value={String(data.length)} />
+              <MetaItem label={t("au.shown")} value={String(rows.length)} />
+              <MetaItem label={t("au.retention")} value={t("au.appendOnly")} />
             </>
           )
         }
@@ -106,11 +108,11 @@ export default function AdminAuditPage() {
         <input
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search action, actor or target"
-          aria-label="Search audit events"
+          placeholder={t("au.searchPlaceholder")}
+          aria-label={t("au.searchLabel")}
           className={`${inputClass} max-w-sm`}
         />
-        <div className="flex gap-1" role="group" aria-label="Filter by role">
+        <div className="flex gap-1" role="group" aria-label={t("filter.byRole")}>
           {ROLE_FILTERS.map((option) => (
             <button
               key={option}
@@ -122,22 +124,22 @@ export default function AdminAuditPage() {
                   : "border-[color:var(--line)] text-ink-faint hover:text-ink"
               }`}
             >
-              {option === "ALL" ? "All roles" : humanizeEnum(option)}
+              {option === "ALL" ? t("filter.allRoles") : humanizeEnum(option)}
             </button>
           ))}
         </div>
       </div>
 
-      <Panel title={`Events · ${rows.length}`}>
+      <Panel title={`${t("au.events")} · ${rows.length}`}>
         {isLoading ? (
           <Skeleton rows={6} />
         ) : rows.length === 0 ? (
           <EmptyState
-            title={data && data.length > 0 ? "Nothing matches that filter" : "No audit events yet"}
+            title={data && data.length > 0 ? t("au.noMatch") : t("au.none")}
             body={
               data && data.length > 0
-                ? "Clear the search or pick a different role."
-                : "Sign-ins, record changes and analyses are written here as they happen."
+                ? t("au.noMatchBody")
+                : t("au.noneBody")
             }
           />
         ) : (
@@ -147,9 +149,9 @@ export default function AdminAuditPage() {
                 <div className="min-w-0">
                   <p className="text-[14px] text-ink">{humanizeAuditAction(row.action)}</p>
                   <p className="mt-0.5 font-mono text-[11px] text-ink-faint">
-                    {row.actorName ?? row.actorEmail ?? "Unknown actor"} · {humanizeEnum(row.actorRole)} ·{" "}
+                    {row.actorName ?? row.actorEmail ?? t("common.unknownActor")} · {humanizeEnum(row.actorRole)} ·{" "}
                     {humanizeEnum(row.targetType)}
-                    {row.ruleSetVersion ? ` · rule set ${row.ruleSetVersion}` : ""}
+                    {row.ruleSetVersion ? t("au.ruleSet", { version: row.ruleSetVersion }) : ""}
                   </p>
                 </div>
                 <span className="shrink-0 font-mono text-[11px] tabular-nums text-ink-faint">

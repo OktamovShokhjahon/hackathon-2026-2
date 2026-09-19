@@ -1,6 +1,7 @@
 "use client";
 
-import { ORGANS, STATE_GLYPH, STATE_HEX, STATE_LABEL } from "./anatomy";
+import { ORGANS, STATE_GLYPH, STATE_HEX, STATE_LABEL_KEY, organLabelKey } from "./anatomy";
+import { useI18n } from "@/lib/i18n";
 import type { OrganSignal } from "./types";
 
 /**
@@ -16,13 +17,14 @@ export function BodyDiagram({
   selectedOrgan: string | null;
   onSelectOrgan: (key: string | null) => void;
 }) {
+  const { t } = useI18n();
   const byKey = new Map(signals.map((signal) => [signal.organ, signal]));
 
   return (
     <svg
       viewBox="0 0 200 420"
       role="img"
-      aria-label="Body diagram showing organ risk states"
+      aria-label={t("twin.bodyDiagram")}
       className="h-full w-full"
     >
       <defs>
@@ -65,8 +67,8 @@ export function BodyDiagram({
             className="cursor-pointer"
             tabIndex={0}
             role="button"
-            aria-label={`${organ.label}: ${
-              signal ? STATE_LABEL[signal.color] : "not assessed"
+            aria-label={`${t(organLabelKey(organ.key))}: ${
+              signal ? t(STATE_LABEL_KEY[signal.color]) : t("twin.notAssessed")
             }`}
             onKeyDown={(event) => {
               if (event.key === "Enter" || event.key === " ") {

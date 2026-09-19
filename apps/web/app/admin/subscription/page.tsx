@@ -7,6 +7,7 @@ import { MetaItem, PageHeader, Panel, Skeleton } from "@/components/ui/console";
 import { useToast } from "@/components/ui/toast";
 import { api, ApiError } from "@/lib/api-client";
 import { formatDate, humanizeEnum } from "@/lib/format";
+import { useI18n } from "@/lib/i18n";
 
 interface SubscriptionData {
   plan: "DEMO" | "MONTHLY" | "YEARLY";
@@ -31,6 +32,7 @@ const STATE_COLOR: Record<string, string> = {
 
 /** A usage meter that says what happens at the limit, not just where you are. */
 function UsageMeter({ label, used, limit, hint }: { label: string; used: number; limit: number; hint: string }) {
+  const { t } = useI18n();
   const ratio = limit === 0 ? 0 : Math.min(1, used / limit);
   const tone = ratio >= 1 ? "var(--state-red)" : ratio >= 0.8 ? "var(--state-amber)" : "var(--signal)";
 
@@ -49,7 +51,7 @@ function UsageMeter({ label, used, limit, hint }: { label: string; used: number;
         aria-valuenow={used}
         aria-valuemin={0}
         aria-valuemax={limit}
-        aria-label={`${label}: ${used} of ${limit}`}
+        aria-label={t("as.meterLabel", { label, used, limit })}
       >
         <span
           className="block h-full rounded-full transition-[width] duration-700"
@@ -57,7 +59,7 @@ function UsageMeter({ label, used, limit, hint }: { label: string; used: number;
         />
       </div>
       <p className="mt-2 text-[12px] leading-snug text-ink-faint">
-        {ratio >= 1 ? "At the plan limit — upgrade to add more." : hint}
+        {ratio >= 1 ? t("as.atLimit") : hint}
       </p>
     </div>
   );
@@ -66,6 +68,7 @@ function UsageMeter({ label, used, limit, hint }: { label: string; used: number;
 export default function AdminSubscriptionPage() {
   const queryClient = useQueryClient();
   const toast = useToast();
+  const { t } = useI18n();
   const [error, setError] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
@@ -80,24 +83,24 @@ export default function AdminSubscriptionPage() {
       setError(null);
       // The provider is a mock for the hackathon, so there is no hosted page to
       // send anyone to. Say so plainly rather than pretending a payment ran.
-      toast(`Mock checkout session created (${session.sessionId.slice(0, 22)}…)`, "info");
+      toast(t("as.mockCheckout", { id: session.sessionId.slice(0, 22) }), "info");
       queryClient.invalidateQueries({ queryKey: ["subscription"] });
     },
-    onError: (err) => setError(err instanceof ApiError ? err.message : "The checkout session could not be created"),
+    onError: (err) => setError(err instanceof ApiError ? err.message : t("as.checkoutFailed")),
   });
 
   return (
     <AppShell role="ADMIN" navItems={ADMIN_NAV}>
       <PageHeader
-        eyebrow="Billing"
-        title="Subscription"
-        description="What this clinic is entitled to, and how much of it is in use. Reaching a limit stops new work — it never removes or hides anything already recorded."
+        eyebrow={t("as.eyebrow")}
+        title={t("as.title")}
+        description={t("as.description")}
         meta={
           data && (
             <>
-              <MetaItem label="Plan" value={data.plan} />
-              <MetaItem label="State" value={humanizeEnum(data.state)} />
-              <MetaItem label="Provider" value={data.provider} />
+              <MetaItem label={t("as.plan")} value={humanizeEnum(data.plan)} />
+              <MetaItem label={t("as.state")} value={humanizeEnum(data.state)} />
+              <MetaItem label={t("as.provider")} value={data.provider} />
             </>
           )
         }
@@ -111,31 +114,31 @@ export default function AdminSubscriptionPage() {
 
       {data && (
         <div className="grid items-start gap-4 lg:grid-cols-[1.2fr_1fr]">
-          <Panel title="Usage this period">
+          <Panel title={t("as.usageThisPeriod")}>
             <div className="flex flex-col gap-5">
               <UsageMeter
-                label="Doctor accounts"
+                label={t("as.doctorAccounts")}
                 used={data.usage.doctorsCount}
                 limit={data.limits.maxDoctors}
-                hint="Counts accounts that can sign in."
+                hint={t("as.doctorAccountsHint")}
               />
               <UsageMeter
-                label="Patients"
+                label={t("as.patients")}
                 used={data.usage.patientsCount}
                 limit={data.limits.maxPatients}
-                hint="Archived patients do not count."
+                hint={t("as.patientsHint")}
               />
               <UsageMeter
-                label="AI analyses"
+                label={t("as.aiAnalyses")}
                 used={data.usage.aiAnalysesThisPeriod}
                 limit={data.limits.maxAiAnalysesPerMonth}
-                hint="Treatment analyses run in the current billing period."
+                hint={t("as.aiAnalysesHint")}
               />
             </div>
           </Panel>
 
           <div className="flex flex-col gap-4">
-            <Panel title="Status">
+            <Panel title={t("as.status")}>
               <div className="flex items-center gap-2">
                 <span
                   aria-hidden
@@ -143,22 +146,22 @@ export default function AdminSubscriptionPage() {
                   style={{ background: STATE_COLOR[data.state] ?? "var(--ink-faint)" }}
                 />
                 <span className="text-[15px] text-ink">
-                  {data.plan} — {humanizeEnum(data.state)}
+                  {humanizeEnum(data.plan)} — {humanizeEnum(data.state)}
                 </span>
               </div>
 
               {data.trialDaysRemaining !== undefined && data.state === "trialing" && (
                 <p className="mt-3 text-[13px] leading-relaxed text-ink-muted">
                   {data.trialDaysRemaining === 0
-                    ? "The demo period has ended."
-                    : `${data.trialDaysRemaining} day${data.trialDaysRemaining === 1 ? "" : "s"} of the demo remain`}
-                  {data.trialEndsAt ? ` · ends ${formatDate(data.trialEndsAt)}` : ""}
+                    ? t("as.demoEnded")
+                    : t("as.demoRemain", { days: data.trialDaysRemaining })}
+                  {data.trialEndsAt ? t("as.demoEnds", { date: formatDate(data.trialEndsAt) }) : ""}
                 </p>
               )}
 
               {data.currentPeriodEnd && (
                 <p className="mt-2 font-mono text-[11px] text-ink-faint">
-                  Current period ends {formatDate(data.currentPeriodEnd)}
+                  {t("as.periodEnds", { date: formatDate(data.currentPeriodEnd) })}
                 </p>
               )}
 
@@ -173,11 +176,9 @@ export default function AdminSubscriptionPage() {
               )}
             </Panel>
 
-            <Panel title="Change plan">
+            <Panel title={t("as.changePlan")}>
               <p className="max-w-readable text-[13px] leading-relaxed text-ink-muted">
-                Billing runs through a mock provider in this build. The checkout call and the signed
-                webhook that activates a plan are the real interfaces — only the payment page is
-                absent.
+                {t("as.changePlanBody")}
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 {(["MONTHLY", "YEARLY"] as const).map((plan) => (
@@ -187,7 +188,9 @@ export default function AdminSubscriptionPage() {
                     disabled={checkout.isPending || data.plan === plan}
                     className="rounded border border-[color:var(--line-strong)] px-4 py-2 text-sm text-ink transition hover:bg-ink/[0.04] disabled:opacity-50"
                   >
-                    {data.plan === plan ? `Current: ${humanizeEnum(plan)}` : `Switch to ${humanizeEnum(plan)}`}
+                    {data.plan === plan
+                      ? t("as.current", { plan: humanizeEnum(plan) })
+                      : t("as.switchTo", { plan: humanizeEnum(plan) })}
                   </button>
                 ))}
               </div>

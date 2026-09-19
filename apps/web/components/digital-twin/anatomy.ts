@@ -1,4 +1,5 @@
 import type { RiskColor } from "./types";
+import type { MessageKey } from "@/lib/locales/uz";
 
 export type Sex = "male" | "female" | "neutral";
 
@@ -173,6 +174,21 @@ export const ORGAN_LABELS: Record<string, string> = Object.fromEntries(
   ORGANS.map((organ) => [organ.key, organ.label]),
 );
 
+/**
+ * Message keys for an organ and for a system grouping. The registry keeps the
+ * English `label`/`system` as the structural name, and these resolve it into
+ * whichever language the console is running in — so an organ added to the
+ * registry is translated by adding two dictionary entries, not by touching
+ * every view that draws it.
+ */
+export function organLabelKey(organKey: string): MessageKey {
+  return `organ.${organKey}` as MessageKey;
+}
+
+export function systemLabelKey(system: string): MessageKey {
+  return `system.${system}` as MessageKey;
+}
+
 /** Clinical state colours, matching the table in technical mission §8.7. */
 export const STATE_HEX: Record<RiskColor, string> = {
   green: "#0f8a5f",
@@ -194,10 +210,16 @@ export const STATE_GLYPH: Record<RiskColor, string> = {
   red: "✕",
 };
 
-export const STATE_LABEL: Record<RiskColor, string> = {
-  green: "No significant risk",
-  yellow: "Monitoring required",
-  red: "High-priority risk",
+/**
+ * The state wording lives in the dictionaries, so this maps a colour onto its
+ * message key and callers translate it. Colour is never the only signal, and
+ * the text that carries the signal has to be readable in the console's
+ * language.
+ */
+export const STATE_LABEL_KEY: Record<RiskColor, MessageKey> = {
+  green: "risk.green",
+  yellow: "risk.yellow",
+  red: "risk.red",
 };
 
 /** Unmapped organ signals still need somewhere to render. */

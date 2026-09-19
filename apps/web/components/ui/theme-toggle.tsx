@@ -1,6 +1,7 @@
 "use client";
 
 import { useTheme } from "@/lib/theme";
+import { useI18n } from "@/lib/i18n";
 
 /**
  * Day/night switch. The lamp in the mark is lit at night and dark by day, so
@@ -9,6 +10,7 @@ import { useTheme } from "@/lib/theme";
  */
 export function ThemeToggle({ onNavy = false }: { onNavy?: boolean }) {
   const { resolved, toggle } = useTheme();
+  const { t } = useI18n();
   const isDark = resolved === "dark";
 
   return (
@@ -16,8 +18,8 @@ export function ThemeToggle({ onNavy = false }: { onNavy?: boolean }) {
       type="button"
       onClick={toggle}
       aria-pressed={isDark}
-      aria-label={isDark ? "Switch to day mode" : "Switch to night mode"}
-      title={isDark ? "Day mode" : "Night mode"}
+      aria-label={isDark ? t("theme.toDay") : t("theme.toNight")}
+      title={isDark ? t("theme.day") : t("theme.night")}
       className={`group inline-flex items-center gap-2 rounded-md border px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] transition ${
         onNavy
           ? "border-white/15 text-white/55 hover:border-white/30 hover:text-white"
@@ -50,7 +52,7 @@ export function ThemeToggle({ onNavy = false }: { onNavy?: boolean }) {
           </>
         )}
       </svg>
-      {isDark ? "Night" : "Day"}
+      {isDark ? t("theme.night") : t("theme.day")}
     </button>
   );
 }

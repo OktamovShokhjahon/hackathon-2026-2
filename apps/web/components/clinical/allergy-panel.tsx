@@ -7,6 +7,7 @@ import { inputClass } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { api, ApiError } from "@/lib/api-client";
 import { humanizeEnum } from "@/lib/format";
+import { useI18n } from "@/lib/i18n";
 
 interface Allergy {
   _id: string;
@@ -33,6 +34,7 @@ const EMPTY = { substance: "", reaction: "", severity: "unknown" as Allergy["sev
 export function AllergyPanel({ patientId }: { patientId: string }) {
   const queryClient = useQueryClient();
   const toast = useToast();
+  const { t } = useI18n();
   const [form, setForm] = useState(EMPTY);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,14 +53,14 @@ export function AllergyPanel({ patientId }: { patientId: string }) {
     onSuccess: () => {
       setForm(EMPTY);
       setError(null);
-      toast("Allergy recorded — future analyses will check against it");
+      toast(t("allergy.saved"));
       queryClient.invalidateQueries({ queryKey: ["allergies", patientId] });
     },
-    onError: (err) => setError(err instanceof ApiError ? err.message : "The allergy could not be saved"),
+    onError: (err) => setError(err instanceof ApiError ? err.message : t("allergy.saveFailed")),
   });
 
   return (
-    <Panel title={`Allergies${data && data.length > 0 ? ` · ${data.length}` : ""}`}>
+    <Panel title={`${t("allergy.title")}${data && data.length > 0 ? ` · ${data.length}` : ""}`}>
       <form
         onSubmit={(event) => {
           event.preventDefault();
@@ -68,33 +70,33 @@ export function AllergyPanel({ patientId }: { patientId: string }) {
       >
         <input
           required
-          placeholder="Substance, e.g. Penicillin"
+          placeholder={t("allergy.substance")}
           value={form.substance}
           onChange={(event) => setForm((f) => ({ ...f, substance: event.target.value }))}
           className={`${inputClass} flex-1`}
         />
         <input
-          placeholder="Reaction"
+          placeholder={t("allergy.reaction")}
           value={form.reaction}
           onChange={(event) => setForm((f) => ({ ...f, reaction: event.target.value }))}
           className={`${inputClass} w-36`}
         />
         <select
           value={form.severity}
-          aria-label="Severity"
+          aria-label={t("allergy.severity")}
           onChange={(event) => setForm((f) => ({ ...f, severity: event.target.value as Allergy["severity"] }))}
           className={`${inputClass} w-32`}
         >
-          <option value="unknown">Unknown</option>
-          <option value="mild">Mild</option>
-          <option value="moderate">Moderate</option>
-          <option value="severe">Severe</option>
+          <option value="unknown">{t("allergy.unknown")}</option>
+          <option value="mild">{t("allergy.mild")}</option>
+          <option value="moderate">{t("allergy.moderate")}</option>
+          <option value="severe">{t("allergy.severe")}</option>
         </select>
         <button
           disabled={addAllergy.isPending || form.substance.trim().length === 0}
           className="rounded bg-electric px-4 py-2 text-sm font-medium text-white transition hover:bg-electric/90 disabled:opacity-60"
         >
-          {addAllergy.isPending ? "Adding…" : "Add"}
+          {addAllergy.isPending ? t("allergy.adding") : t("action.add")}
         </button>
       </form>
 
@@ -125,8 +127,8 @@ export function AllergyPanel({ patientId }: { patientId: string }) {
         </ul>
       ) : (
         <EmptyState
-          title="No allergies recorded"
-          body="An empty list is not the same as none known — record what the patient reports, so analyses can check against it."
+          title={t("allergy.none")}
+          body={t("allergy.noneBody")}
         />
       )}
     </Panel>
