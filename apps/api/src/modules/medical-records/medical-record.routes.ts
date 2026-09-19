@@ -22,6 +22,7 @@ recordsRouter.post("/", async (req, res, next) => {
       sourceType: input.sourceType,
       status: input.status,
       note: input.note,
+      sourceDocumentId: input.sourceDocumentId,
       createdBy: req.auth!.userId,
     });
 

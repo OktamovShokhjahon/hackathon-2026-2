@@ -8,7 +8,7 @@ import { MedicalRecord } from "../medical-records/medical-record.model";
 import { Allergy } from "../medications/allergy.model";
 import { TreatmentScenario } from "./treatment-scenario.model";
 import { runClinicalRules, type PatientSnapshot } from "./rule-engine";
-import { callGroqStructured, NARRATIVE_SCHEMA } from "./groq.client";
+import { callModelStructured, NARRATIVE_SCHEMA } from "./model.client";
 import { AIJob } from "./ai-job.model";
 import { RULE_SET_VERSION } from "./rule-catalog";
 
@@ -127,10 +127,10 @@ export async function createTreatmentScenario(input: CreateTreatmentScenarioInpu
     task: "scenario_narrative",
     status: "processing",
     promptVersion: PROMPT_VERSION,
-    modelId: env.groqModel,
+    modelId: env.aiModelId,
   });
 
-  const aiResult = await callGroqStructured({
+  const aiResult = await callModelStructured({
     systemPrompt:
       "You are a clinical explanation assistant. You ONLY explain deterministic rule results already computed by the system. " +
       "Never invent thresholds, drug choices, or contraindications. If information is insufficient, say so. " +
@@ -171,7 +171,7 @@ export async function createTreatmentScenario(input: CreateTreatmentScenarioInpu
     projectionFrom,
     projectionTo,
     confidence,
-    modelId: env.groqModel,
+    modelId: env.aiModelId,
     promptVersion: PROMPT_VERSION,
     ruleSetVersion: RULE_SET_VERSION,
     // The explanation is stored with the analysis it explains: a doctor

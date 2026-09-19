@@ -8,6 +8,7 @@ import { DigitalTwinViewer } from "@/components/digital-twin/digital-twin-viewer
 import { api } from "@/lib/api-client";
 import type { OrganSignal } from "@/components/digital-twin/types";
 import { twinSex } from "@/components/digital-twin/anatomy";
+import type { TwinTimelineData } from "@/components/digital-twin/twin-timeline";
 
 interface Scenario {
   _id: string;
@@ -33,6 +34,11 @@ export default function PatientDigitalTwinPage() {
   const { data: profile } = useQuery({
     queryKey: ["me-profile"],
     queryFn: () => api.get<{ sex?: string }>("/me/profile"),
+  });
+  // Rule output only, so this is cheap enough to load alongside the twin.
+  const { data: timeline, isLoading: timelineLoading } = useQuery({
+    queryKey: ["me-twin-timeline"],
+    queryFn: () => api.get<TwinTimelineData>("/me/twin-timeline"),
   });
   const [horizon, setHorizon] = useState(30);
 
@@ -91,6 +97,8 @@ export default function PatientDigitalTwinPage() {
               sex={twinSex(profile?.sex)}
               horizons={available}
               onHorizonChange={setHorizon}
+              timeline={timeline}
+              timelineLoading={timelineLoading}
               analysisMeta={{
                 analyzedAt: scenario.createdAt,
                 modelId: scenario.modelId,

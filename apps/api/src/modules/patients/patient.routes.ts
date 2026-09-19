@@ -14,6 +14,7 @@ import { medicationRouter, allergyRouter } from "../medications/medication.route
 import { treatmentScenarioRouter } from "../ai-analysis/treatment-scenario.routes";
 import { documentUploadRouter } from "../documents/document.routes";
 import { getPreventionPlanForPatient } from "../prevention/prevention.service";
+import { buildTwinTimeline } from "../ai-analysis/twin-timeline.service";
 
 export const patientRouter = Router();
 
@@ -78,6 +79,20 @@ patientRouter.get("/:patientId/prevention-plan", requireRole("DOCTOR"), async (r
   try {
     const plan = await getPreventionPlanForPatient(req.auth!.tenantId, req.params.patientId);
     res.json(plan);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * The dated states behind the twin's time scrubber. Rule output only — no
+ * model is called and nothing is projected, so this is safe to read as often
+ * as the scrubber needs it.
+ */
+patientRouter.get("/:patientId/twin-timeline", requireRole("DOCTOR"), async (req, res, next) => {
+  try {
+    const timeline = await buildTwinTimeline(req.auth!.tenantId, req.params.patientId);
+    res.json(timeline);
   } catch (err) {
     next(err);
   }

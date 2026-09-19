@@ -10,6 +10,7 @@ import { Diagnosis } from "../diagnoses/diagnosis.model";
 import { Medication } from "../medications/medication.model";
 import { TreatmentScenario } from "../ai-analysis/treatment-scenario.model";
 import { getPreventionPlanForPatient } from "../prevention/prevention.service";
+import { buildTwinTimeline } from "../ai-analysis/twin-timeline.service";
 
 export const meRouter = Router();
 meRouter.use(requireAuth, requireRole("PATIENT"));
@@ -94,6 +95,20 @@ meRouter.get("/prevention-plan", async (req, res, next) => {
     const profile = await getOwnProfile(req.auth!.userId, req.auth!.tenantId);
     const plan = await getPreventionPlanForPatient(req.auth!.tenantId, String(profile._id));
     res.json(plan);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * The patient's own twin timeline. Built from verified records only, exactly
+ * like the doctor's, so the two views cannot disagree about what happened.
+ */
+meRouter.get("/twin-timeline", async (req, res, next) => {
+  try {
+    const profile = await getOwnProfile(req.auth!.userId, req.auth!.tenantId);
+    const timeline = await buildTwinTimeline(req.auth!.tenantId, String(profile._id));
+    res.json(timeline);
   } catch (err) {
     next(err);
   }
