@@ -5,7 +5,7 @@ import { z } from "zod";
 import { HttpError } from "../../middleware/errorHandler";
 import { DocumentModel } from "./document.model";
 import { AIJob } from "../ai-analysis/ai-job.model";
-import { callGroqStructured } from "../ai-analysis/groq.client";
+import { callModelStructured } from "../ai-analysis/model.client";
 import { MedicalRecord } from "../medical-records/medical-record.model";
 import { extractDocumentText } from "./text-extraction";
 import { extractFactsDeterministically } from "./deterministic-extraction";
@@ -119,10 +119,10 @@ export async function analyzeDocument(params: {
     task: "document_understanding",
     status: "processing",
     promptVersion: PROMPT_VERSION,
-    modelId: env.groqModel,
+    modelId: env.aiModelId,
   });
 
-  const result = await callGroqStructured({
+  const result = await callModelStructured({
     systemPrompt:
       "You extract candidate clinical facts from a medical document. Return ONLY facts explicitly present in the text. " +
       'Use "unknown" rather than guessing. Every fact needs a sourceSpan quoting the originating text. ' +

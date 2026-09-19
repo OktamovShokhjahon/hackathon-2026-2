@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { callGroqStructured } from "../ai-analysis/groq.client";
+import { callModelStructured } from "../ai-analysis/model.client";
 import { HttpError } from "../../middleware/errorHandler";
 import { ChatConversation } from "./chat-conversation.model";
 import { PatientProfile } from "../patients/patient.model";
@@ -45,7 +45,7 @@ export async function sendChatMessage(params: {
     }
   }
 
-  const result = await callGroqStructured({
+  const result = await callModelStructured({
     systemPrompt:
       "You are TwinRx's educational health assistant. You must: " +
       "1) never diagnose or prescribe; 2) never change any medical record; " +

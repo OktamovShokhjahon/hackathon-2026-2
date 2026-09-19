@@ -36,7 +36,16 @@ const CAMERA_PRESETS: Record<TwinView, [number, number, number]> = {
   right: [2.45, 0.95, 0.01],
 };
 
-const TARGET = new THREE.Vector3(0, 0.9, 0);
+/** Where the camera looks when nothing has been zoomed into. */
+const HOME_TARGET = new THREE.Vector3(0, 0.9, 0);
+
+/**
+ * How far the look-at point may wander from the body axis. Cursor-anchored
+ * zoom moves the target, and without a fence a scroll aimed at the far edge of
+ * the stage would walk the body out of frame with no way back but Reset.
+ */
+const TARGET_MIN = new THREE.Vector3(-0.45, 0.16, -0.45);
+const TARGET_MAX = new THREE.Vector3(0.45, 1.84, 0.45);
 
 interface OrganState {
   before: RiskColor | null;
@@ -263,48 +272,56 @@ function Organ({
           body opens up rather than staying at the authored coordinate. */}
       {hovered && (
         <group ref={cardRef} position={organ.sites[0].position}>
+        {/* No distanceFactor: the card is chrome, not anatomy. Scaling it with
+            the scene made it swallow the stage at close zoom — exactly when the
+            organ underneath most needs to stay visible. */}
         <Html
           center
-          distanceFactor={2.2}
           zIndexRange={[30, 0]}
           style={{ pointerEvents: "none" }}
         >
           <div
-            className="w-[210px] rounded-lg border bg-surface/95 p-3 text-left shadow-lg backdrop-blur"
+            className="w-[186px] rounded-md border bg-surface/95 p-2.5 text-left shadow-lg backdrop-blur"
             style={{
               borderColor: hoveredState ? STATE_HEX[hoveredState] : "var(--line-strong)",
               // Organs high in the body would push the card off the top of the
               // stage, so those flip below the organ instead.
               transform:
-                organ.sites[0].position[1] > 1.45 ? "translateY(76px)" : "translateY(-76px)",
+                organ.sites[0].position[1] > 1.45 ? "translateY(58px)" : "translateY(-58px)",
             }}
           >
             <div className="font-mono text-[9px] uppercase tracking-[0.16em] text-ink-faint">
               {organ.system}
             </div>
-            <div className="mt-0.5 font-display text-[15px] leading-tight text-ink">
+            <div className="mt-0.5 font-display text-[13px] leading-tight text-ink">
               {organ.label}
             </div>
 
             <div
-              className="mt-2 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.1em]"
+              className="mt-1.5 flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.1em]"
               style={{ color: hoveredState ? STATE_HEX[hoveredState] : "var(--ink-faint)" }}
             >
               <span aria-hidden>{hoveredState ? STATE_GLYPH[hoveredState] : "–"}</span>
               {hoveredState ? STATE_LABEL[hoveredState] : "Not assessed"}
             </div>
 
-            <p className="mt-2 text-[12px] leading-relaxed text-ink-muted">
-              {hoveredSignal
-                ? hoveredSignal.explanation
-                : "This scenario did not assess this organ. That is not the same as a clear result."}
+            {/* Two lines at most. The full explanation and the missing-data
+                list are one click away in the organ readout, where there is
+                room for them without covering the body. */}
+            <p className="mt-1.5 line-clamp-2 text-[11px] leading-snug text-ink-muted">
+              {hoveredSignal ? hoveredSignal.explanation : "Not assessed in this scenario."}
             </p>
 
             {hoveredSignal && hoveredSignal.missingData.length > 0 && (
-              <p className="mt-2 font-mono text-[9px] uppercase leading-relaxed tracking-[0.1em] text-state-amber">
-                Missing: {hoveredSignal.missingData.join(" · ")}
+              <p className="mt-1.5 font-mono text-[9px] uppercase tracking-[0.1em] text-state-amber">
+                {hoveredSignal.missingData.length} missing input
+                {hoveredSignal.missingData.length === 1 ? "" : "s"}
               </p>
             )}
+
+            <p className="mt-1.5 font-mono text-[9px] uppercase tracking-[0.1em] text-ink-faint">
+              Click for detail
+            </p>
           </div>
         </Html>
         </group>
@@ -394,6 +411,95 @@ function Projector({
   return null;
 }
 
+/**
+ * Cursor-anchored zoom. Scrolling in used to march the camera at the navel
+ * whatever you were looking at, so reaching a kidney meant zooming in and then
+ * dragging it back into frame. This aims the look-at point at whatever sits
+ * under the pointer instead, so the thing you are pointing at is the thing you
+ * end up in front of.
+ */
+function CursorZoom({
+  target,
+  desiredTarget,
+  groupRef,
+}: {
+  /** The live OrbitControls target. Mutated in place, never replaced. */
+  target: THREE.Vector3;
+  /** Where the target is heading; the wheel writes here. */
+  desiredTarget: THREE.Vector3;
+  groupRef: MutableRefObject<THREE.Group | null>;
+}) {
+  const { gl, camera } = useThree();
+  const raycaster = useMemo(() => new THREE.Raycaster(), []);
+  const pointer = useMemo(() => new THREE.Vector2(), []);
+  const scratch = useMemo(() => new THREE.Vector3(), []);
+  const inside = useRef(false);
+
+  useEffect(() => {
+    const element = gl.domElement;
+
+    const move = (event: PointerEvent) => {
+      const rect = element.getBoundingClientRect();
+      pointer.set(
+        ((event.clientX - rect.left) / rect.width) * 2 - 1,
+        -((event.clientY - rect.top) / rect.height) * 2 + 1,
+      );
+      inside.current = true;
+    };
+
+    const leave = () => {
+      inside.current = false;
+    };
+
+    const wheel = (event: WheelEvent) => {
+      // Zooming back out returns to the body axis, so the model always
+      // reassembles centred however far the viewer wandered on the way in.
+      if (event.deltaY >= 0) {
+        desiredTarget.copy(HOME_TARGET);
+        return;
+      }
+      if (!inside.current) return;
+
+      raycaster.setFromCamera(pointer, camera);
+      const group = groupRef.current;
+      const hit = group
+        ? raycaster.intersectObject(group, true).find((entry) => entry.object.type === "Mesh")
+        : undefined;
+
+      if (hit) {
+        scratch.copy(hit.point);
+      } else {
+        // Nothing under the cursor. Aim at the point on the cursor ray that is
+        // as far off as the current look-at point, so a scroll over empty
+        // space still drifts the right way rather than snapping back.
+        scratch
+          .copy(raycaster.ray.direction)
+          .multiplyScalar(camera.position.distanceTo(target))
+          .add(camera.position);
+      }
+
+      desiredTarget.copy(scratch).clamp(TARGET_MIN, TARGET_MAX);
+    };
+
+    element.addEventListener("pointermove", move);
+    element.addEventListener("pointerleave", leave);
+    element.addEventListener("wheel", wheel, { passive: true });
+    return () => {
+      element.removeEventListener("pointermove", move);
+      element.removeEventListener("pointerleave", leave);
+      element.removeEventListener("wheel", wheel);
+    };
+  }, [gl, camera, raycaster, pointer, scratch, target, desiredTarget, groupRef]);
+
+  // Eased, not assigned: OrbitControls carries the camera along with its
+  // target, so snapping the target would fling the body across the stage.
+  useFrame(() => {
+    target.lerp(desiredTarget, 0.12);
+  });
+
+  return null;
+}
+
 /** Distance at which the body is whole, and the closest the camera may come. */
 export const FULL_BODY_DISTANCE = 2.45;
 export const CLOSEST_DISTANCE = 0.85;
@@ -408,7 +514,7 @@ function dissectionFor(distance: number): number {
   return clamped * clamped * (3 - 2 * clamped);
 }
 
-function CameraRig({ view }: { view: TwinView }) {
+function CameraRig({ view, target }: { view: TwinView; target: THREE.Vector3 }) {
   const { camera } = useThree();
   const goal = useMemo(() => new THREE.Vector3(...CAMERA_PRESETS.front), []);
   const settling = useRef(false);
@@ -416,16 +522,22 @@ function CameraRig({ view }: { view: TwinView }) {
   useEffect(() => {
     // Turning the body must not undo the zoom, so a view change re-aims the
     // camera along the new axis while keeping the distance the viewer chose.
+    // It orbits around wherever the viewer zoomed to, not around the axis.
     const preset = new THREE.Vector3(...CAMERA_PRESETS[view]);
-    const distance = camera.position.distanceTo(TARGET) || FULL_BODY_DISTANCE;
-    goal.copy(preset).sub(TARGET).normalize().multiplyScalar(distance).add(TARGET);
+    const distance = camera.position.distanceTo(target) || FULL_BODY_DISTANCE;
+    goal
+      .copy(preset)
+      .sub(HOME_TARGET)
+      .normalize()
+      .multiplyScalar(distance)
+      .add(target);
     settling.current = true;
-  }, [view, goal, camera]);
+  }, [view, goal, camera, target]);
 
   useFrame(() => {
     if (!settling.current) return;
     camera.position.lerp(goal, 0.08);
-    camera.lookAt(TARGET);
+    camera.lookAt(target);
     if (camera.position.distanceTo(goal) < 0.02) settling.current = false;
   });
 
@@ -440,16 +552,20 @@ function ZoomReporter({
   dissectRef,
   onZoomChange,
   controlsRef,
+  target,
+  desiredTarget,
 }: {
   dissectRef: MutableRefObject<number>;
   onZoomChange?: (zoom: number) => void;
   controlsRef: MutableRefObject<ZoomApi | null>;
+  target: THREE.Vector3;
+  desiredTarget: THREE.Vector3;
 }) {
   const { camera } = useThree();
   const lastReported = useRef(-1);
 
   useFrame(() => {
-    const distance = camera.position.distanceTo(TARGET);
+    const distance = camera.position.distanceTo(target);
     dissectRef.current = dissectionFor(distance);
 
     const zoom = FULL_BODY_DISTANCE / Math.max(distance, 0.0001);
@@ -465,24 +581,28 @@ function ZoomReporter({
   useEffect(() => {
     controlsRef.current = {
       zoomBy(factor: number) {
-        const direction = camera.position.clone().sub(TARGET);
+        const direction = camera.position.clone().sub(target);
         const next = Math.min(
           FULL_BODY_DISTANCE,
           Math.max(CLOSEST_DISTANCE, direction.length() / factor),
         );
-        camera.position.copy(direction.normalize().multiplyScalar(next).add(TARGET));
-        camera.lookAt(TARGET);
+        camera.position.copy(direction.normalize().multiplyScalar(next).add(target));
+        camera.lookAt(target);
+        // The buttons zoom at the centre of the frame, so they must not leave a
+        // cursor-chosen look-at point pulling the camera sideways afterwards.
+        if (factor < 1) desiredTarget.copy(HOME_TARGET);
       },
       reset() {
-        const direction = camera.position.clone().sub(TARGET).normalize();
-        camera.position.copy(direction.multiplyScalar(FULL_BODY_DISTANCE).add(TARGET));
-        camera.lookAt(TARGET);
+        desiredTarget.copy(HOME_TARGET);
+        const direction = camera.position.clone().sub(target).normalize();
+        camera.position.copy(direction.multiplyScalar(FULL_BODY_DISTANCE).add(target));
+        camera.lookAt(target);
       },
     };
     return () => {
       controlsRef.current = null;
     };
-  }, [camera, controlsRef]);
+  }, [camera, controlsRef, target, desiredTarget]);
 
   return null;
 }
@@ -554,6 +674,9 @@ export function BodyScene({
 }) {
   const organs = useMemo(() => organsFor(sex), [sex]);
   const turntableRef = useRef<THREE.Group | null>(null);
+  // One vector per scene, mutated in place: OrbitControls holds the reference.
+  const target = useMemo(() => HOME_TARGET.clone(), []);
+  const desiredTarget = useMemo(() => HOME_TARGET.clone(), []);
   const dissectRef = useRef(0);
   const siteRegistry = useRef<Record<string, Array<THREE.Group | null>>>({});
   const fallbackZoomApi = useRef<ZoomApi | null>(null);
@@ -584,11 +707,14 @@ export function BodyScene({
       <directionalLight position={[2.5, 3.5, 2.5]} intensity={1.5} color="#ffffff" />
       <directionalLight position={[-2.5, 1.5, -1.5]} intensity={0.5} color="#dbe7f3" />
 
-      <CameraRig view={view} />
+      <CameraRig view={view} target={target} />
+      <CursorZoom target={target} desiredTarget={desiredTarget} groupRef={turntableRef} />
       <ZoomReporter
         dissectRef={dissectRef}
         onZoomChange={onZoomChange}
         controlsRef={zoomApi ?? fallbackZoomApi}
+        target={target}
+        desiredTarget={desiredTarget}
       />
       <Projector
         organs={organs}
@@ -620,7 +746,7 @@ export function BodyScene({
       </Turntable>
 
       <OrbitControls
-        target={TARGET}
+        target={target}
         enablePan={false}
         enableZoom
         zoomSpeed={0.7}

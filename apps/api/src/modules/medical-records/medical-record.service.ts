@@ -12,6 +12,7 @@ export async function addMedicalRecord(params: {
   sourceType: SourceType;
   status: VerificationStatus;
   note?: string;
+  sourceDocumentId?: string;
   createdBy: string;
 }) {
   const record = await MedicalRecord.create({
@@ -23,6 +24,10 @@ export async function addMedicalRecord(params: {
     sourceType: params.sourceType,
     verificationStatus: params.status,
     note: params.note,
+    sourceDocumentId: params.sourceDocumentId,
+    // Mirrored into sourceReferences too: that is where the rest of the app
+    // looks when it renders where a fact came from.
+    sourceReferences: params.sourceDocumentId ? [{ documentId: params.sourceDocumentId }] : [],
     createdBy: params.createdBy,
   });
 

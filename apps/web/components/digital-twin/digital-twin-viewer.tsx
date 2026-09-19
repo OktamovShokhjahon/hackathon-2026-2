@@ -9,6 +9,7 @@ import { OrganLabels, type Projection } from "./organ-labels";
 import type { OrganSignal, RiskColor } from "./types";
 import type { TwinView, ZoomApi } from "./body-scene";
 import { ZoomControls } from "./zoom-controls";
+import { TwinTimeline, type TwinTimelineData } from "./twin-timeline";
 import { ProvenanceChip } from "@/components/ui/provenance-chip";
 import { usePrefersReducedMotion } from "@/lib/use-reduced-motion";
 
@@ -47,6 +48,8 @@ export function DigitalTwinViewer({
   sex = "male",
   horizons,
   onHorizonChange,
+  timeline,
+  timelineLoading,
   analysisMeta,
 }: {
   beforeSignals: OrganSignal[];
@@ -56,6 +59,9 @@ export function DigitalTwinViewer({
   sex?: Sex;
   horizons?: number[];
   onHorizonChange?: (days: number) => void;
+  /** Dated rule output from the chart, for the scrubber under the model. */
+  timeline?: TwinTimelineData;
+  timelineLoading?: boolean;
   analysisMeta?: {
     analyzedAt?: string;
     modelId?: string;
@@ -74,6 +80,8 @@ export function DigitalTwinViewer({
   const [view, setView] = useState<TwinView>("front");
   const [autoRotate, setAutoRotate] = useState(true);
   const [selectedOrgan, setSelectedOrgan] = useState<string | null>(null);
+  // null means the twin is showing the scenario rather than a day in the past.
+  const [timeIndex, setTimeIndex] = useState<number | null>(null);
   const animation = useRef<number | null>(null);
   const projection = useRef<Projection>({});
 
@@ -114,7 +122,19 @@ export function DigitalTwinViewer({
     if (animation.current) cancelAnimationFrame(animation.current);
   }, []);
 
-  const activeSignals = mix > 0.5 ? afterSignals : beforeSignals;
+  // A day picked on the scrubber replaces both ends of the morph: there is no
+  // before and after in the past, only what the chart said on that date.
+  const historyPoint =
+    timeIndex !== null ? timeline?.points[timeIndex] ?? null : null;
+  const sceneBefore = historyPoint ? historyPoint.signals : beforeSignals;
+  const sceneAfter = historyPoint ? historyPoint.signals : afterSignals;
+  const sceneMix = historyPoint ? 1 : mix;
+
+  const activeSignals = historyPoint
+    ? historyPoint.signals
+    : mix > 0.5
+      ? afterSignals
+      : beforeSignals;
   const hasBaseline = beforeSignals.length > 0;
 
   const delta = useMemo(() => {
@@ -238,9 +258,9 @@ export function DigitalTwinViewer({
             <div className="h-full w-full animate-pulse bg-ink/[0.035]" />
           ) : webglSupported && !prefer2d ? (
             <BodyScene
-              beforeSignals={beforeSignals}
-              afterSignals={afterSignals}
-              mix={mix}
+              beforeSignals={sceneBefore}
+              afterSignals={sceneAfter}
+              mix={sceneMix}
               view={view}
               sex={model}
               projection={projection}
@@ -276,7 +296,9 @@ export function DigitalTwinViewer({
           <div className="flex flex-col gap-1">
           <span className="readout">Digital twin</span>
           <span className="font-mono text-[11px] tabular-nums text-signal">
-            {mix > 0.5 ? "AFTER" : "BEFORE"} · {horizonDays}D HORIZON
+            {historyPoint
+              ? `HISTORY · ${new Date(historyPoint.date).toLocaleDateString()}`
+              : `${mix > 0.5 ? "AFTER" : "BEFORE"} · ${horizonDays}D HORIZON`}
           </span>
           {(webglSupported === false || prefer2d) && (
             <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-faint">
@@ -291,9 +313,19 @@ export function DigitalTwinViewer({
 
       </div>
 
+      {/* Time scrubber, directly under the model it drives */}
+      <div className="lg:col-start-1 lg:row-start-2">
+        <TwinTimeline
+          timeline={timeline}
+          index={timeIndex}
+          onIndexChange={setTimeIndex}
+          loading={timelineLoading}
+        />
+      </div>
+
       {/* Organ readout rail */}
       <aside
-        className="flex max-h-[720px] flex-col self-start overflow-hidden rounded-lg border"
+        className="flex max-h-[720px] flex-col self-start overflow-hidden rounded-lg border lg:col-start-2 lg:row-start-1"
         style={{ borderColor: "var(--line)" }}
       >
         <div
@@ -316,7 +348,7 @@ export function DigitalTwinViewer({
       </div>
 
       {/* Morph slider */}
-      {hasBaseline && (
+      {hasBaseline && !historyPoint && (
         <div className="flex items-center gap-4">
           <span className="readout shrink-0">Before</span>
           <input

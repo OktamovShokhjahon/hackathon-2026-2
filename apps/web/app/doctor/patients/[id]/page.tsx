@@ -9,6 +9,7 @@ import { EmptyState, MetaItem, PageHeader, Panel, Tabs } from "@/components/ui/c
 import { Field, Modal, inputClass } from "@/components/ui/modal";
 import { DigitalTwinViewer } from "@/components/digital-twin/digital-twin-viewer";
 import { twinSex } from "@/components/digital-twin/anatomy";
+import type { TwinTimelineData } from "@/components/digital-twin/twin-timeline";
 import { DiagnosisDetail, type DiagnosisAiDetail } from "@/components/clinical/diagnosis-detail";
 import { DrugReferenceModal } from "@/components/clinical/drug-reference-modal";
 import { HistoryModal } from "@/components/clinical/history-modal";
@@ -145,6 +146,11 @@ export default function PatientDetailPage() {
   const { data: scenarios } = useQuery({
     queryKey: ["scenarios", id],
     queryFn: () => api.get<Scenario[]>(`/patients/${id}/treatment-scenarios`),
+  });
+  // Deterministic rule output per recorded date; drives the time scrubber.
+  const { data: twinTimeline, isLoading: twinTimelineLoading } = useQuery({
+    queryKey: ["twin-timeline", id],
+    queryFn: () => api.get<TwinTimelineData>(`/patients/${id}/twin-timeline`),
   });
 
   // Entry lives behind a button rather than in a permanently open form: a
@@ -574,6 +580,8 @@ export default function PatientDetailPage() {
                 afterSignals={latestScenario.signals}
                 horizonDays={latestScenario.horizonDays}
                 sex={twinSex(patient?.profile?.sex)}
+                timeline={twinTimeline}
+                timelineLoading={twinTimelineLoading}
                 analysisMeta={{
                   analyzedAt: latestScenario.createdAt,
                   modelId: latestScenario.modelId,

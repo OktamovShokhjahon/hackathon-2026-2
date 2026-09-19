@@ -42,4 +42,10 @@ export const createRecordSchema = z.object({
     .enum(["unverified", "ai_unverified", "verified", "historical", "resolved", "active", "rejected"])
     .default("unverified"),
   note: z.string().optional(),
+  /**
+   * An uploaded document this record was read from. The file goes through the
+   * normal document pipeline first; this only records which one it came from,
+   * so the record carries its provenance rather than standing on its own.
+   */
+  sourceDocumentId: z.string().optional(),
 });

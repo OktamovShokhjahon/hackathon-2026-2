@@ -14,7 +14,7 @@ remain with a qualified healthcare professional.**
 ## Local development
 
 ```bash
-cp .env.example .env      # fill in MONGODB_URI / GROQ_API_KEY, or use docker-compose's defaults
+cp .env.example .env      # fill in MONGODB_URI / GEMINI_API_KEY, or use docker-compose's defaults
 npm install
 docker compose up -d mongodb   # or point MONGODB_URI at your own instance
 npm run dev:api            # http://localhost:4000
