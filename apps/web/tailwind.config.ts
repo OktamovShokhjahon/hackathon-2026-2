@@ -11,6 +11,8 @@ const config: Config = {
         surface: "#ffffff",
         sunken: "#e3ebf4",
         signal: "#0e7f8f",
+        navy: { DEFAULT: "#0b1c2e", deep: "#07131f" },
+        cyan: "#35d0e0",
         electric: "#2f5fe0",
         ai: "#6d4fd6",
         state: {

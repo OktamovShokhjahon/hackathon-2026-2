@@ -3,6 +3,7 @@ import { Instrument_Sans, Inter, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import { QueryProvider } from "@/lib/query-provider";
 import { SafetyBanner } from "@/components/ui/safety-banner";
+import { ToastProvider } from "@/components/ui/toast";
 
 const display = Instrument_Sans({
   subsets: ["latin"],
@@ -31,10 +32,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`dark ${display.variable} ${body.variable} ${mono.variable}`}>
       <body>
         <QueryProvider>
-          <div className="flex min-h-screen flex-col">
-            <div className="flex-1">{children}</div>
-            <SafetyBanner />
-          </div>
+          <ToastProvider>
+            <div className="flex min-h-screen flex-col">
+              <div className="flex-1">{children}</div>
+              <SafetyBanner />
+            </div>
+          </ToastProvider>
         </QueryProvider>
       </body>
     </html>

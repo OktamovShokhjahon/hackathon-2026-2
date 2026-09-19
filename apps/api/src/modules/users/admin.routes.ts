@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { Types } from "mongoose";
 import { z } from "zod";
 import crypto from "node:crypto";
 import { requireAuth } from "../../middleware/auth";
@@ -13,6 +14,8 @@ import { Subscription } from "../subscriptions/subscription.model";
 import { TreatmentScenario } from "../ai-analysis/treatment-scenario.model";
 import { hashPassword } from "../auth/auth.service";
 import { recordAuditEvent } from "../audit/audit.service";
+import { assertEntitlement, getSubscriptionWithUsage } from "../subscriptions/entitlements.service";
+import { attachPatientIdentity } from "../patients/patient-identity";
 
 export const adminRouter = Router();
 adminRouter.use(requireAuth, requireRole("ADMIN"), stripClientTenantId);
@@ -23,12 +26,18 @@ adminRouter.get("/dashboard", async (req, res, next) => {
     const [activeDoctors, activePatients, patientsByStatus, recentAnalyses, highRiskAlerts] = await Promise.all([
       User.countDocuments({ tenantId, role: "DOCTOR", status: "active" }),
       PatientProfile.countDocuments({ tenantId, status: { $ne: "ARCHIVED" } }),
-      PatientProfile.aggregate([{ $match: { tenantId: req.auth!.tenantId } }, { $group: { _id: "$status", count: { $sum: 1 } } }]),
+      PatientProfile.aggregate([{ $match: { tenantId: new Types.ObjectId(tenantId) } }, { $group: { _id: "$status", count: { $sum: 1 } } }]),
       TreatmentScenario.find({ tenantId }).sort({ createdAt: -1 }).limit(10).lean(),
       TreatmentScenario.countDocuments({ tenantId, overallRisk: "red" }),
     ]);
 
-    res.json({ activeDoctors, activePatients, patientsByStatus, recentAnalyses, highRiskAlerts });
+    res.json({
+      activeDoctors,
+      activePatients,
+      patientsByStatus,
+      recentAnalyses: await attachPatientIdentity(tenantId, recentAnalyses),
+      highRiskAlerts,
+    });
   } catch (err) {
     next(err);
   }
@@ -55,6 +64,7 @@ adminRouter.get("/doctors", async (req, res, next) => {
 adminRouter.post("/doctors", async (req, res, next) => {
   try {
     const input = createDoctorSchema.parse(req.body);
+    await assertEntitlement(req.auth!.tenantId, "doctor");
     const existing = await User.findOne({ tenantId: req.auth!.tenantId, email: input.email.toLowerCase() });
     if (existing) throw new HttpError(409, "A user with this email already exists");
 
@@ -129,8 +139,12 @@ adminRouter.post("/doctors/:doctorId/reset-password", async (req, res, next) => 
 
 adminRouter.get("/patients", async (req, res, next) => {
   try {
-    const patients = await PatientProfile.find({ tenantId: req.auth!.tenantId }).sort({ createdAt: -1 });
-    res.json(patients);
+    const patients = await PatientProfile.find({ tenantId: req.auth!.tenantId }).sort({ createdAt: -1 }).lean();
+    const users = await User.find({ tenantId: req.auth!.tenantId, _id: { $in: patients.map((p) => p.userId) } })
+      .select("fullName email")
+      .lean();
+    const byId = new Map(users.map((u) => [String(u._id), u]));
+    res.json(patients.map((p) => ({ ...p, user: byId.get(String(p.userId)) })));
   } catch (err) {
     next(err);
   }
@@ -147,8 +161,18 @@ adminRouter.get("/diagnoses/recent", async (req, res, next) => {
 
 adminRouter.get("/audit-events", async (req, res, next) => {
   try {
-    const events = await AuditEvent.find({ tenantId: req.auth!.tenantId }).sort({ createdAt: -1 }).limit(200);
-    res.json(events);
+    const events = await AuditEvent.find({ tenantId: req.auth!.tenantId }).sort({ createdAt: -1 }).limit(200).lean();
+    const actors = await User.find({ tenantId: req.auth!.tenantId, _id: { $in: events.map((e) => e.actorId) } })
+      .select("fullName email")
+      .lean();
+    const byId = new Map(actors.map((u) => [String(u._id), u]));
+    res.json(
+      events.map((event) => ({
+        ...event,
+        actorName: byId.get(String(event.actorId))?.fullName,
+        actorEmail: byId.get(String(event.actorId))?.email,
+      }))
+    );
   } catch (err) {
     next(err);
   }
@@ -156,7 +180,7 @@ adminRouter.get("/audit-events", async (req, res, next) => {
 
 adminRouter.get("/subscription", async (req, res, next) => {
   try {
-    const subscription = await Subscription.findOne({ tenantId: req.auth!.tenantId });
+    const subscription = await getSubscriptionWithUsage(req.auth!.tenantId);
     res.json(subscription);
   } catch (err) {
     next(err);

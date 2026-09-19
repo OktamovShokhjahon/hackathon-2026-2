@@ -5,7 +5,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/ui/app-shell";
 import { EmptyState, PageHeader, Panel, Skeleton } from "@/components/ui/console";
 import { Field, Modal, inputClass } from "@/components/ui/modal";
+import { useToast } from "@/components/ui/toast";
 import { api, ApiError } from "@/lib/api-client";
+import { humanizeEnum } from "@/lib/format";
 
 const NAV = [
   { href: "/admin/dashboard", label: "Dashboard" },
@@ -27,6 +29,8 @@ const EMPTY = { fullName: "", email: "", phone: "", password: "" };
 
 export default function AdminDoctorsPage() {
   const queryClient = useQueryClient();
+  const toast = useToast();
+  const [tempPasswordFor, setTempPasswordFor] = useState<{ name: string; password: string } | null>(null);
   const { data: doctors, isLoading } = useQuery({
     queryKey: ["doctors"],
     queryFn: () => api.get<Doctor[]>("/admin/doctors"),
@@ -48,6 +52,21 @@ export default function AdminDoctorsPage() {
     },
     onError: (err) =>
       setError(err instanceof ApiError ? err.message : "Could not create the doctor"),
+  });
+
+  const resetPassword = useMutation({
+    mutationFn: (doctor: Doctor) =>
+      api
+        .post<{ tempPassword: string }>(`/admin/doctors/${doctor._id}/reset-password`)
+        .then((result) => ({ ...result, name: doctor.fullName })),
+    onSuccess: (result) => {
+      // Shown once, here, and never stored in the clinic record: the admin has
+      // to hand it over before leaving this screen.
+      setTempPasswordFor({ name: result.name, password: result.tempPassword });
+      queryClient.invalidateQueries({ queryKey: ["doctors"] });
+    },
+    onError: (err) =>
+      setError(err instanceof ApiError ? err.message : "The password could not be reset"),
   });
 
   const toggleStatus = useMutation({
@@ -79,6 +98,38 @@ export default function AdminDoctorsPage() {
           </button>
         }
       />
+
+      {tempPasswordFor && (
+        <div
+          role="status"
+          className="mb-4 rounded border border-state-amber/40 bg-state-amber/10 px-4 py-3"
+        >
+          <p className="text-sm text-state-amber">
+            Temporary password for {tempPasswordFor.name}. It is shown once — their existing
+            sessions have been signed out.
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <code className="rounded bg-surface px-2.5 py-1 font-mono text-[13px] text-ink">
+              {tempPasswordFor.password}
+            </code>
+            <button
+              onClick={() => {
+                navigator.clipboard?.writeText(tempPasswordFor.password);
+                toast("Temporary password copied");
+              }}
+              className="font-mono text-[11px] uppercase tracking-[0.1em] text-signal hover:underline"
+            >
+              Copy
+            </button>
+            <button
+              onClick={() => setTempPasswordFor(null)}
+              className="font-mono text-[11px] uppercase tracking-[0.1em] text-ink-faint hover:text-ink"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       {created && (
         <p
@@ -118,8 +169,15 @@ export default function AdminDoctorsPage() {
                             : "var(--state-amber)",
                     }}
                   >
-                    {doctor.status.replace(/_/g, " ")}
+                    {humanizeEnum(doctor.status)}
                   </span>
+                  <button
+                    onClick={() => resetPassword.mutate(doctor)}
+                    disabled={resetPassword.isPending}
+                    className="rounded border border-[color:var(--line)] px-3 py-1.5 text-sm text-ink transition hover:bg-ink/[0.04] disabled:opacity-60"
+                  >
+                    Reset password
+                  </button>
                   <button
                     onClick={() =>
                       toggleStatus.mutate({

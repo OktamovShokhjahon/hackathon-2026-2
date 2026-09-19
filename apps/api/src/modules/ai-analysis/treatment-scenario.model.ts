@@ -9,6 +9,10 @@ export interface OrganSignal {
   explanation: string;
   evidenceRecordIds: string[];
   missingData: string[];
+  /** The values the rule actually read, so the finding can be checked. */
+  observed?: Array<{ field: string; label: string; value: number; unit?: string }>;
+  /** Deterministic follow-up note from the catalog, never model-written. */
+  monitoring?: string;
   ruleCode?: string;
 }
 
@@ -33,6 +37,13 @@ export interface TreatmentScenarioDoc {
   modelId: string;
   promptVersion: string;
   ruleSetVersion: string;
+  /** Plain-language explanation of the rule result, written by the model. */
+  aiNarrative?: string;
+  /** Who wrote the narrative: the model, or a restatement of the rule output. */
+  narrativeSource?: "model" | "rule_summary";
+  /** False when the model was unreachable: the rule result still stands alone. */
+  aiAvailable: boolean;
+  aiError?: string;
   disclaimer: string;
   status: TreatmentDecisionState;
   doctorReview?: {
@@ -70,6 +81,8 @@ const treatmentScenarioSchema = new Schema<TreatmentScenarioDoc>(
         explanation: String,
         evidenceRecordIds: [String],
         missingData: [String],
+        observed: [{ field: String, label: String, value: Number, unit: String }],
+        monitoring: String,
         ruleCode: String,
       },
     ],
@@ -83,6 +96,10 @@ const treatmentScenarioSchema = new Schema<TreatmentScenarioDoc>(
     modelId: { type: String, required: true },
     promptVersion: { type: String, required: true },
     ruleSetVersion: { type: String, required: true },
+    aiNarrative: { type: String },
+    narrativeSource: { type: String, enum: ["model", "rule_summary"] },
+    aiAvailable: { type: Boolean, default: false },
+    aiError: { type: String },
     disclaimer: {
       type: String,
       default: "This is decision support and not a diagnosis or prescription.",

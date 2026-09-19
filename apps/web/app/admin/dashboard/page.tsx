@@ -15,7 +15,9 @@ import {
   RiskRibbon,
   Row,
 } from "@/components/ui/console";
+import { AnalysisTrend, type TrendPoint } from "@/components/charts/analysis-trend";
 import { api } from "@/lib/api-client";
+import { formatDateTime } from "@/lib/format";
 import type { RiskColor } from "@/components/digital-twin/types";
 
 const NAV = [
@@ -35,6 +37,8 @@ interface DashboardData {
     overallRisk: RiskColor;
     createdAt: string;
     patientId: string;
+    patientName?: string;
+    patientCode?: string;
   }>;
   highRiskAlerts: number;
 }
@@ -43,6 +47,11 @@ export default function AdminDashboardPage() {
   const { data, isLoading, isError } = useQuery({
     queryKey: ["admin-dashboard"],
     queryFn: () => api.get<DashboardData>("/admin/dashboard"),
+  });
+
+  const { data: trends } = useQuery({
+    queryKey: ["analytics-trends"],
+    queryFn: () => api.get<TrendPoint[]>("/analytics/trends"),
   });
 
   const counts = useMemo(() => {
@@ -149,6 +158,16 @@ export default function AdminDashboardPage() {
           </div>
 
           <div className="mt-4">
+            <Panel title="Analysis volume">
+              <AnalysisTrend data={trends ?? []} />
+              <p className="mt-4 border-t border-[color:var(--line)] pt-3 text-[12px] leading-relaxed text-ink-faint">
+                Analyses run per day across the clinic, with the high-priority share drawn on top.
+                Volume only — no clinical content reaches this page.
+              </p>
+            </Panel>
+          </div>
+
+          <div className="mt-4">
             <Panel
               title="Recent analyses"
               action={
@@ -170,8 +189,8 @@ export default function AdminDashboardPage() {
                   {data.recentAnalyses.map((analysis) => (
                     <Row
                       key={analysis._id}
-                      primary={`Patient ${String(analysis.patientId).slice(-6)}`}
-                      secondary={new Date(analysis.createdAt).toLocaleString()}
+                      primary={analysis.patientName ?? analysis.patientCode ?? "Unnamed patient"}
+                      secondary={formatDateTime(analysis.createdAt)}
                       trailing={<RiskBadge color={analysis.overallRisk} quiet />}
                     />
                   ))}

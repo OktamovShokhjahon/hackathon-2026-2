@@ -10,6 +10,11 @@ export interface DocumentDoc {
   storageKey: string;
   virusScanStatus: "pending" | "clean" | "infected";
   extractedText?: string;
+  /** How the text was obtained: a parser, or a person pasting it. */
+  extractionMethod?: "pdf_text_layer" | "docx" | "plain_text" | "pasted" | "none";
+  extractionNote?: string;
+  /** Set once a doctor has been offered the extracted candidates. */
+  analyzedAt?: Date;
   aiJobId?: Types.ObjectId;
   uploadedBy: Types.ObjectId;
   createdAt: Date;
@@ -26,6 +31,12 @@ const documentSchema = new Schema<DocumentDoc>(
     storageKey: { type: String, required: true },
     virusScanStatus: { type: String, enum: ["pending", "clean", "infected"], default: "pending" },
     extractedText: { type: String },
+    extractionMethod: {
+      type: String,
+      enum: ["pdf_text_layer", "docx", "plain_text", "pasted", "none"],
+    },
+    extractionNote: { type: String },
+    analyzedAt: { type: Date },
     aiJobId: { type: Schema.Types.ObjectId, ref: "AIJob" },
     uploadedBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
   },
