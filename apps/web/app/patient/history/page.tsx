@@ -3,21 +3,12 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
-import { AppShell } from "@/components/ui/app-shell";
+import { AppShell, PATIENT_NAV } from "@/components/ui/app-shell";
 import { EmptyState, MetaItem, PageHeader, Panel, Skeleton } from "@/components/ui/console";
 import { inputClass } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { api, ApiError } from "@/lib/api-client";
 import { fieldLabel, formatDate, humanizeEnum } from "@/lib/format";
-
-const NAV = [
-  { href: "/patient/dashboard", label: "Dashboard" },
-  { href: "/patient/history", label: "History" },
-  { href: "/patient/diagnoses", label: "Diagnoses" },
-  { href: "/patient/medications", label: "Medications" },
-  { href: "/patient/digital-twin", label: "Digital twin" },
-  { href: "/patient/chat", label: "Chat" },
-];
 
 interface HistoryRecord {
   _id: string;
@@ -75,7 +66,7 @@ export default function PatientHistoryPage() {
   }, [data]);
 
   return (
-    <AppShell role="PATIENT" navItems={NAV}>
+    <AppShell role="PATIENT" navItems={PATIENT_NAV}>
       <PageHeader
         eyebrow="Your record"
         title="Your medical history"

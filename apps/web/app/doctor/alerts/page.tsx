@@ -2,17 +2,11 @@
 
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AppShell } from "@/components/ui/app-shell";
+import { AppShell, DOCTOR_NAV } from "@/components/ui/app-shell";
 import { RiskBadge } from "@/components/ui/risk-badge";
 import { EmptyState, MetaItem, PageHeader, Panel, Row, Skeleton } from "@/components/ui/console";
 import { api } from "@/lib/api-client";
 import type { RiskColor } from "@/components/digital-twin/types";
-
-const NAV = [
-  { href: "/doctor/dashboard", label: "Dashboard" },
-  { href: "/doctor/patients", label: "Patients" },
-  { href: "/doctor/alerts", label: "Alerts" },
-];
 
 interface Scenario {
   _id: string;
@@ -45,7 +39,7 @@ export default function DoctorAlertsPage() {
   const high = alerts.filter((item) => item.overallRisk === "red").length;
 
   return (
-    <AppShell role="DOCTOR" navItems={NAV}>
+    <AppShell role="DOCTOR" navItems={DOCTOR_NAV}>
       <PageHeader
         eyebrow="Alerts"
         title="Analyses waiting on a decision"

@@ -306,3 +306,81 @@ export function Row({
     body
   );
 }
+
+/* ------------------------------------------------------------------ tabs */
+
+export interface TabDef {
+  id: string;
+  label: string;
+  /** Shown beside the label when there is something to count. */
+  count?: number;
+}
+
+/**
+ * Section switcher for a page that holds several distinct jobs.
+ *
+ * A patient chart is not one task: reading the record, running a projection,
+ * and reviewing prevention are separate things a doctor does at separate
+ * moments. Stacking them made one page eight screens tall, where the cost of
+ * every section was paid on every visit. Each tab is one job.
+ *
+ * Arrow keys move between tabs, matching how a tablist is expected to behave.
+ */
+export function Tabs({
+  tabs,
+  active,
+  onChange,
+  className = "",
+}: {
+  tabs: TabDef[];
+  active: string;
+  onChange: (id: string) => void;
+  className?: string;
+}) {
+  function onKeyDown(event: React.KeyboardEvent) {
+    const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+    if (!step) return;
+    event.preventDefault();
+    const current = tabs.findIndex((tab) => tab.id === active);
+    const next = (current + step + tabs.length) % tabs.length;
+    onChange(tabs[next].id);
+  }
+
+  return (
+    <div
+      role="tablist"
+      aria-label="Chart sections"
+      onKeyDown={onKeyDown}
+      className={`flex items-stretch gap-1 overflow-x-auto border-b border-[color:var(--line)] ${className}`}
+    >
+      {tabs.map((tab) => {
+        const selected = tab.id === active;
+        return (
+          <button
+            key={tab.id}
+            role="tab"
+            type="button"
+            aria-selected={selected}
+            tabIndex={selected ? 0 : -1}
+            onClick={() => onChange(tab.id)}
+            className="group relative shrink-0 px-3.5 py-2.5 font-mono text-[11px] uppercase tracking-[0.14em] transition"
+            style={{ color: selected ? "var(--ink)" : "var(--ink-faint)" }}
+          >
+            <span className="flex items-center gap-1.5">
+              {tab.label}
+              {tab.count !== undefined && tab.count > 0 && (
+                <span className="readout-value text-[10px] text-ink-faint">{tab.count}</span>
+              )}
+            </span>
+            {/* The lamp marks where you are. */}
+            <span
+              aria-hidden
+              className="absolute inset-x-0 -bottom-px h-[2px] transition"
+              style={{ background: selected ? "var(--lamp)" : "transparent" }}
+            />
+          </button>
+        );
+      })}
+    </div>
+  );
+}

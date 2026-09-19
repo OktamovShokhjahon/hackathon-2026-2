@@ -153,6 +153,12 @@ async function seed() {
 
   // Patient 2: Hypertension with cardiovascular medication-monitoring signal
   const p2 = await createSyntheticPatient("Synthetic Patient Beta", "patient2@twinrx.example", "PT-DEMO-B2");
+  // Beta carries the modifiable risk factors, so the prevention plan has
+  // something real to work from: a current smoker with a BMI just over 30.
+  p2.profile.smokingStatus = "current";
+  p2.profile.heightCm = 176;
+  p2.profile.weightKg = 96;
+  await p2.profile.save();
   const p2Diagnosis = await Diagnosis.create({
     tenantId: tenant._id,
     patientId: p2.profile._id,
@@ -196,6 +202,20 @@ async function seed() {
       verificationStatus: "verified",
       verifiedBy: doctor._id,
       verifiedAt: daysAgo(40),
+      createdBy: doctor._id,
+    },
+    {
+      tenantId: tenant._id,
+      patientId: p2.profile._id,
+      type: "lab_result",
+      eventDate: daysAgo(12),
+      // Above the usual 140 target, so the prevention plan can quote a real
+      // number back rather than offering generic advice.
+      data: { field: "latestSystolicBp", value: 152, unit: "mmHg" },
+      sourceType: "doctor_entry",
+      verificationStatus: "verified",
+      verifiedBy: doctor._id,
+      verifiedAt: daysAgo(12),
       createdBy: doctor._id,
     },
     {

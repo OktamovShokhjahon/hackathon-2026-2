@@ -1,19 +1,10 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { AppShell } from "@/components/ui/app-shell";
+import { AppShell, PATIENT_NAV } from "@/components/ui/app-shell";
 import { EmptyState, MetaItem, PageHeader, Panel, Skeleton } from "@/components/ui/console";
 import { api } from "@/lib/api-client";
 import { formatDate, humanizeEnum } from "@/lib/format";
-
-const NAV = [
-  { href: "/patient/dashboard", label: "Dashboard" },
-  { href: "/patient/history", label: "History" },
-  { href: "/patient/diagnoses", label: "Diagnoses" },
-  { href: "/patient/medications", label: "Medications" },
-  { href: "/patient/digital-twin", label: "Digital twin" },
-  { href: "/patient/chat", label: "Chat" },
-];
 
 interface Medication {
   _id: string;
@@ -39,7 +30,7 @@ export default function PatientMedicationsPage() {
   const stopped = (data ?? []).filter((item) => item.status !== "active");
 
   return (
-    <AppShell role="PATIENT" navItems={NAV}>
+    <AppShell role="PATIENT" navItems={PATIENT_NAV}>
       <PageHeader
         eyebrow="Your record"
         title="Medications"

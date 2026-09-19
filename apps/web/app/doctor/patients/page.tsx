@@ -4,17 +4,11 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AppShell } from "@/components/ui/app-shell";
+import { AppShell, DOCTOR_NAV } from "@/components/ui/app-shell";
 import { EmptyState, PageHeader, Panel, Skeleton } from "@/components/ui/console";
 import { Field, Modal, inputClass } from "@/components/ui/modal";
 import { api, ApiError } from "@/lib/api-client";
 import { humanizeEnum } from "@/lib/format";
-
-const NAV = [
-  { href: "/doctor/dashboard", label: "Dashboard" },
-  { href: "/doctor/patients", label: "Patients" },
-  { href: "/doctor/alerts", label: "Alerts" },
-];
 
 interface PatientRow {
   _id: string;
@@ -78,7 +72,7 @@ export default function DoctorPatientsPage() {
   }
 
   return (
-    <AppShell role="DOCTOR" navItems={NAV}>
+    <AppShell role="DOCTOR" navItems={DOCTOR_NAV}>
       <PageHeader
         eyebrow="Doctor console"
         title="Patients"

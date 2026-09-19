@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AppShell } from "@/components/ui/app-shell";
+import { AppShell, DOCTOR_NAV } from "@/components/ui/app-shell";
 import { RiskBadge } from "@/components/ui/risk-badge";
 import {
   EmptyState,
@@ -17,12 +17,6 @@ import {
 } from "@/components/ui/console";
 import { api } from "@/lib/api-client";
 import type { RiskColor } from "@/components/digital-twin/types";
-
-const NAV = [
-  { href: "/doctor/dashboard", label: "Dashboard" },
-  { href: "/doctor/patients", label: "Patients" },
-  { href: "/doctor/alerts", label: "Alerts" },
-];
 
 interface DoctorDashboard {
   assignedPatients: number;
@@ -63,7 +57,7 @@ export default function DoctorDashboardPage() {
   }, [data]);
 
   return (
-    <AppShell role="DOCTOR" navItems={NAV}>
+    <AppShell role="DOCTOR" navItems={DOCTOR_NAV}>
       <PageHeader
         eyebrow="Doctor console"
         title="What needs you today"

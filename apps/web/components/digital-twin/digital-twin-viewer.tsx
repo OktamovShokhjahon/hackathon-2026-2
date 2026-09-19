@@ -7,7 +7,8 @@ import { BodyDiagram } from "./body-diagram";
 import { STATE_GLYPH, STATE_HEX, STATE_LABEL, type Sex } from "./anatomy";
 import { OrganLabels, type Projection } from "./organ-labels";
 import type { OrganSignal, RiskColor } from "./types";
-import type { TwinView } from "./body-scene";
+import type { TwinView, ZoomApi } from "./body-scene";
+import { ZoomControls } from "./zoom-controls";
 import { ProvenanceChip } from "@/components/ui/provenance-chip";
 import { usePrefersReducedMotion } from "@/lib/use-reduced-motion";
 
@@ -66,6 +67,8 @@ export function DigitalTwinViewer({
   const reducedMotion = usePrefersReducedMotion();
   const [webglSupported, setWebglSupported] = useState<boolean | null>(null);
   const [prefer2d, setPrefer2d] = useState(false);
+  const zoomApi = useRef<ZoomApi | null>(null);
+  const [zoom, setZoom] = useState(1);
   const [model, setModel] = useState<Sex>(sex);
   const [mix, setMix] = useState(1);
   const [view, setView] = useState<TwinView>("front");
@@ -222,9 +225,14 @@ export function DigitalTwinViewer({
       {/* Stage and organ readout */}
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
       <div
-        className="relative overflow-hidden rounded-lg border bg-[#070d16]"
+        className="relative overflow-hidden rounded-lg border bg-[color:var(--console)]"
         style={{ borderColor: "var(--line)" }}
       >
+        {webglSupported && !prefer2d && (
+          <div className="absolute right-4 top-4 z-10">
+            <ZoomControls api={zoomApi} zoom={zoom} onNavy />
+          </div>
+        )}
         <div className="h-[520px] w-full sm:h-[640px] lg:h-[720px]">
           {webglSupported === null ? (
             <div className="h-full w-full animate-pulse bg-ink/[0.035]" />
@@ -240,6 +248,8 @@ export function DigitalTwinViewer({
               reducedMotion={reducedMotion}
               selectedOrgan={selectedOrgan}
               onSelectOrgan={setSelectedOrgan}
+              zoomApi={zoomApi}
+              onZoomChange={setZoom}
             />
           ) : (
             <div className="flex h-full items-center justify-center p-6">

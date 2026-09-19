@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, type MutableRefObject } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { getBodyGeometry } from "./body-geometry";
@@ -109,12 +109,27 @@ function useShellMaterials() {
 /** The body never intercepts pointer events — the organs inside are the targets. */
 const IGNORE_RAYCAST = () => null;
 
-export function BodyShell({ sex }: { sex: Sex }) {
+/**
+ * `dissect` runs 0 → 1 as the camera closes in. At 1 the skin is gone: close
+ * up, a translucent body over separated organs reads as fog rather than as
+ * anatomy, so the shell gets out of the way entirely and the organs carry the
+ * frame. The depth prepass is switched off with it — left on, it would keep
+ * writing a silhouette that nothing draws into.
+ */
+export function BodyShell({ sex, dissectRef }: { sex: Sex; dissectRef?: MutableRefObject<number> }) {
   const geometry = useMemo(() => getBodyGeometry(sex), [sex]);
   const { shell, prepass } = useShellMaterials();
+  const groupRef = useRef<THREE.Group>(null);
+
+  useFrame(() => {
+    const dissect = dissectRef?.current ?? 0;
+    const opacity = 0.96 * (1 - dissect);
+    shell.uniforms.uOpacity.value = opacity;
+    if (groupRef.current) groupRef.current.visible = opacity > 0.02;
+  });
 
   return (
-    <group>
+    <group ref={groupRef}>
       <mesh geometry={geometry} material={prepass} renderOrder={1} raycast={IGNORE_RAYCAST} />
       <mesh geometry={geometry} material={shell} renderOrder={2} raycast={IGNORE_RAYCAST} />
     </group>
@@ -205,14 +220,34 @@ export function VascularTree({ color, intensity }: { color: THREE.Color; intensi
    Skeleton hint: a faint ribcage so the chest cavity has depth behind the heart.
    -------------------------------------------------------------------------- */
 
-export function Ribcage() {
+export function Ribcage({ dissectRef }: { dissectRef?: MutableRefObject<number> }) {
   const ribs = useMemo(() => [1.16, 1.22, 1.28, 1.34], []);
+  const materials = useRef<THREE.MeshBasicMaterial[]>([]);
+  const groupRef = useRef<THREE.Group>(null);
+
+  // The cage opens as the view closes in: ribs thin out and lift apart, so the
+  // heart behind them is read directly rather than through a grille.
+  useFrame(() => {
+    const dissect = dissectRef?.current ?? 0;
+    for (const material of materials.current) material.opacity = 0.5 * (1 - dissect * 0.88);
+    if (groupRef.current) groupRef.current.scale.setScalar(1 + dissect * 0.16);
+  });
+
+  materials.current = [];
+
   return (
-    <group renderOrder={0}>
+    <group ref={groupRef} renderOrder={0}>
       {ribs.map((y, index) => (
         <mesh key={y} position={[0, y, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[1, 0.66, 1]}>
           <torusGeometry args={[0.136 - index * 0.004, 0.005, 8, 40, Math.PI * 1.55]} />
-          <meshBasicMaterial color="#b9c6d4" transparent opacity={0.5} depthWrite={false} />
+          <meshBasicMaterial
+            ref={(material: THREE.MeshBasicMaterial | null) => {
+              if (material) materials.current.push(material);
+            }}
+            color="#b9c6d4"
+            transparent
+            depthWrite={false}
+          />
         </mesh>
       ))}
     </group>

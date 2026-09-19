@@ -2,21 +2,13 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { AppShell } from "@/components/ui/app-shell";
+import { AppShell, PATIENT_NAV } from "@/components/ui/app-shell";
 import { RiskBadge } from "@/components/ui/risk-badge";
 import { EmptyState, MetaItem, PageHeader, Panel, Row, Skeleton } from "@/components/ui/console";
 import { LabTrend, type LabRecord } from "@/components/charts/lab-trend";
+import { PreventionPlanPanel } from "@/components/clinical/prevention-plan";
 import { api } from "@/lib/api-client";
 import type { RiskColor } from "@/components/digital-twin/types";
-
-const NAV = [
-  { href: "/patient/dashboard", label: "Dashboard" },
-  { href: "/patient/history", label: "History" },
-  { href: "/patient/diagnoses", label: "Diagnoses" },
-  { href: "/patient/medications", label: "Medications" },
-  { href: "/patient/digital-twin", label: "Digital twin" },
-  { href: "/patient/chat", label: "Chat" },
-];
 
 interface Diagnosis {
   _id: string;
@@ -59,7 +51,7 @@ export default function PatientDashboardPage() {
   const latest = scenarios.data?.[0];
 
   return (
-    <AppShell role="PATIENT" navItems={NAV}>
+    <AppShell role="PATIENT" navItems={PATIENT_NAV}>
       <PageHeader
         eyebrow="Your health"
         title="What your doctor has recorded"
@@ -175,6 +167,8 @@ export default function PatientDashboardPage() {
           {history.isLoading ? <Skeleton rows={3} /> : <LabTrend records={history.data ?? []} />}
         </Panel>
       </div>
+
+      <PreventionPlanPanel endpoint="/me/prevention-plan" />
 
       <div className="mt-4">
         <Panel title="Questions about any of this">

@@ -2,7 +2,10 @@ import { z } from "zod";
 
 export const registerClinicSchema = z.object({
   clinicName: z.string().min(2).max(200),
-  contactEmail: z.string().email(),
+  // Optional at signup: the registering admin is the clinic contact until
+  // someone sets a different one. Asking twice for the same address at the
+  // door is friction, not data.
+  contactEmail: z.string().email().optional(),
   adminFullName: z.string().min(2).max(200),
   adminEmail: z.string().email(),
   password: z.string().min(10).max(200),

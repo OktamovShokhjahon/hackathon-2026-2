@@ -2,20 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AppShell } from "@/components/ui/app-shell";
+import { AppShell, ADMIN_NAV } from "@/components/ui/app-shell";
 import { EmptyState, MetaItem, PageHeader, Panel, Skeleton } from "@/components/ui/console";
 import { inputClass } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { api } from "@/lib/api-client";
 import { formatDateTime, humanizeAuditAction, humanizeEnum } from "@/lib/format";
-
-const NAV = [
-  { href: "/admin/dashboard", label: "Dashboard" },
-  { href: "/admin/doctors", label: "Doctors" },
-  { href: "/admin/patients", label: "Patients" },
-  { href: "/admin/audit", label: "Audit log" },
-  { href: "/admin/subscription", label: "Subscription" },
-];
 
 interface AuditRow {
   _id: string;
@@ -85,7 +77,7 @@ export default function AdminAuditPage() {
   }
 
   return (
-    <AppShell role="ADMIN" navItems={NAV}>
+    <AppShell role="ADMIN" navItems={ADMIN_NAV}>
       <PageHeader
         eyebrow="Compliance"
         title="Audit log"

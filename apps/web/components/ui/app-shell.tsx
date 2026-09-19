@@ -6,16 +6,49 @@ import { usePathname, useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAuthHydrated, useAuthStore, type Role } from "@/lib/auth-store";
 import { initials } from "@/lib/format";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { LanguageSwitcher } from "@/components/ui/language-switcher";
+import { useI18n } from "@/lib/i18n";
+import type { MessageKey } from "@/lib/locales/uz";
 
-interface NavItem {
+export interface NavItem {
   href: string;
-  label: string;
+  /** Translated at render. Nav labels are chrome, and chrome is translated. */
+  key: MessageKey;
 }
 
-const ROLE_LABEL: Record<Role, string> = {
-  ADMIN: "Clinic admin",
-  DOCTOR: "Doctor",
-  PATIENT: "Patient",
+/**
+ * The navigation each role sees. Defined once here rather than restated in
+ * every page: fifteen copies of the same array is fifteen places a new section
+ * has to be remembered, and fifteen places a translation can drift.
+ */
+export const ADMIN_NAV: NavItem[] = [
+  { href: "/admin/dashboard", key: "nav.dashboard" },
+  { href: "/admin/doctors", key: "nav.doctors" },
+  { href: "/admin/patients", key: "nav.patients" },
+  { href: "/admin/audit", key: "nav.audit" },
+  { href: "/admin/subscription", key: "nav.subscription" },
+];
+
+export const DOCTOR_NAV: NavItem[] = [
+  { href: "/doctor/dashboard", key: "nav.dashboard" },
+  { href: "/doctor/patients", key: "nav.patients" },
+  { href: "/doctor/alerts", key: "nav.alerts" },
+];
+
+export const PATIENT_NAV: NavItem[] = [
+  { href: "/patient/dashboard", key: "nav.dashboard" },
+  { href: "/patient/history", key: "nav.history" },
+  { href: "/patient/diagnoses", key: "nav.diagnoses" },
+  { href: "/patient/medications", key: "nav.medications" },
+  { href: "/patient/digital-twin", key: "nav.digitalTwin" },
+  { href: "/patient/chat", key: "nav.chat" },
+];
+
+const ROLE_KEY: Record<Role, MessageKey> = {
+  ADMIN: "role.admin",
+  DOCTOR: "role.doctor",
+  PATIENT: "role.patient",
 };
 
 export function AppShell({
@@ -38,6 +71,7 @@ export function AppShell({
   const { user, clearSession } = useAuthStore();
   const hydrated = useAuthHydrated();
   const [navOpen, setNavOpen] = useState(false);
+  const { t } = useI18n();
 
   useEffect(() => {
     if (!hydrated) return;
@@ -93,7 +127,7 @@ export function AppShell({
                 style={{ background: "var(--cyan)" }}
               />
             )}
-            {item.label}
+            {t(item.key)}
           </Link>
         );
       })}
@@ -107,10 +141,10 @@ export function AppShell({
       <aside className="navy-rail hidden w-60 flex-col p-4 sm:flex">
         <Link href="/" className="mb-1 flex items-center gap-2 px-2">
           <Mark className="h-5 w-5" onNavy />
-          <span className="display text-lg text-white">TwinRx</span>
+          <span className="display text-lg text-white">MAYOQ AI</span>
         </Link>
         <div className="mb-6 px-2">
-          <span className="readout text-white/45">{ROLE_LABEL[role]}</span>
+          <span className="readout text-white/45">{t(ROLE_KEY[role])}</span>
         </div>
         {nav}
         <div className="my-4 h-px bg-white/10" />
@@ -121,7 +155,7 @@ export function AppShell({
           }}
           className="rounded-md px-3 py-2 text-left font-mono text-[11px] uppercase tracking-[0.12em] text-white/45 transition hover:bg-white/[0.06] hover:text-white/80"
         >
-          Sign out
+          {t("action.signOut")}
         </button>
       </aside>
 
@@ -131,10 +165,10 @@ export function AppShell({
             <button
               onClick={() => setNavOpen((open) => !open)}
               aria-expanded={navOpen}
-              aria-label="Toggle navigation"
+              aria-label={t("nav.toggle")}
               className="rounded border border-[color:var(--line)] px-2 py-1 font-mono text-[11px] text-ink-muted sm:hidden"
             >
-              Menu
+              {t("nav.menu")}
             </button>
             <ol className="flex min-w-0 items-center gap-2 font-mono text-[11px] uppercase tracking-[0.12em] text-ink-faint">
               {crumbs.map((crumb, index) => (
@@ -148,8 +182,10 @@ export function AppShell({
             </ol>
           </div>
           <div className="flex shrink-0 items-center gap-2.5">
+            <LanguageSwitcher />
+            <ThemeToggle />
             <span className="hidden font-mono text-[11px] uppercase tracking-[0.12em] text-ink-faint sm:inline">
-              {ROLE_LABEL[role]}
+              {t(ROLE_KEY[role])}
             </span>
             <span className="hidden text-sm text-ink md:inline">{user.fullName}</span>
             <span
@@ -196,30 +232,35 @@ export function AppShell({
   );
 }
 
-/** Mark: a body axis crossed by a pulse — the twin, reduced to two strokes. */
+/**
+ * Mark: a lamp throwing two beams across a measured horizon. "Mayoq" is a
+ * lighthouse — the product's whole job is to light the hazard before the ship
+ * reaches it. The lamp is the only lit element; the structure around it stays
+ * hairline, so the mark reads as an instrument rather than a badge.
+ */
 export function Mark({ className = "h-5 w-5", onNavy = false }: { className?: string; onNavy?: boolean }) {
+  const structure = onNavy ? "rgba(255,255,255,0.4)" : "var(--line-strong)";
+  const horizon = onNavy ? "rgba(255,255,255,0.75)" : "var(--ink-muted)";
   return (
     <svg viewBox="0 0 24 24" aria-hidden className={className} fill="none">
-      <circle
-        cx="12"
-        cy="12"
-        r="10"
-        stroke={onNavy ? "rgba(255,255,255,0.25)" : "var(--line-strong)"}
-        strokeWidth="1"
-      />
+      {/* The beams, widening as they leave the lens. */}
       <path
-        d="M12 3v7.5M12 13.5V21"
-        stroke={onNavy ? "var(--cyan)" : "var(--electric)"}
-        strokeWidth="1.5"
+        d="M10.1 7.2 3 4.4M10.1 10.4 3 11.6M13.9 7.2 21 4.4M13.9 10.4 21 11.6"
+        stroke="var(--lamp)"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        opacity="0.55"
+      />
+      {/* The lamp itself. */}
+      <circle cx="12" cy="8.8" r="2.5" fill="var(--lamp)" />
+      {/* Tower: two rakes down to a measured base. */}
+      <path
+        d="M10.2 11.6 9 19.4M13.8 11.6 15 19.4"
+        stroke={structure}
+        strokeWidth="1.4"
         strokeLinecap="round"
       />
-      <path
-        d="M4 12h3l1.8-3.2L11 15l2-4.4 1.4 1.4H20"
-        stroke={onNavy ? "#ffffff" : "var(--signal)"}
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      <path d="M7.6 19.4h8.8" stroke={horizon} strokeWidth="1.6" strokeLinecap="round" />
     </svg>
   );
 }

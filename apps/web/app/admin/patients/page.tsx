@@ -2,19 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AppShell } from "@/components/ui/app-shell";
+import { AppShell, ADMIN_NAV } from "@/components/ui/app-shell";
 import { EmptyState, MetaItem, PageHeader, Panel, Skeleton } from "@/components/ui/console";
 import { inputClass } from "@/components/ui/modal";
 import { api } from "@/lib/api-client";
 import { formatDate, humanizeEnum, initials } from "@/lib/format";
-
-const NAV = [
-  { href: "/admin/dashboard", label: "Dashboard" },
-  { href: "/admin/doctors", label: "Doctors" },
-  { href: "/admin/patients", label: "Patients" },
-  { href: "/admin/audit", label: "Audit log" },
-  { href: "/admin/subscription", label: "Subscription" },
-];
 
 interface PatientRow {
   _id: string;
@@ -55,7 +47,7 @@ export default function AdminPatientsPage() {
   }, [data, search, status]);
 
   return (
-    <AppShell role="ADMIN" navItems={NAV}>
+    <AppShell role="ADMIN" navItems={ADMIN_NAV}>
       <PageHeader
         eyebrow="Clinic console"
         title="Patients"

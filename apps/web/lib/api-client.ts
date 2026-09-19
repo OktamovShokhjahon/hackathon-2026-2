@@ -30,7 +30,11 @@ async function refreshSession(): Promise<boolean> {
         body: JSON.stringify({ refreshToken }),
       });
       if (!res.ok) {
-        clearSession();
+        // Only a token the server actually rejected ends the session. A 429
+        // from the rate limiter, a 500, or a dropped connection says nothing
+        // about whether the refresh token is still valid — clearing on those
+        // signed people out mid-session and looked like a broken login.
+        if (res.status === 401 || res.status === 403) clearSession();
         return false;
       }
       const body = await res.json();

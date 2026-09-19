@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { HeroTwin } from "@/components/digital-twin/hero-twin";
 import { Mark } from "@/components/ui/app-shell";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { LanguageSwitcher } from "@/components/ui/language-switcher";
 import { Reveal } from "@/components/ui/reveal";
 import { OrganCoverage } from "@/components/marketing/organ-coverage";
 import { EVIDENCE_GRADES, ProvenanceChip } from "@/components/ui/provenance-chip";
@@ -84,9 +86,11 @@ export default function LandingPage() {
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-2">
             <Mark />
-            <span className="display text-lg text-ink">TwinRx</span>
+            <span className="display text-lg text-ink">MAYOQ AI</span>
           </div>
-          <nav className="flex items-center gap-4">
+          <nav className="flex items-center gap-3 sm:gap-4">
+            <LanguageSwitcher />
+            <ThemeToggle />
             <Link
               href="/login"
               className="font-mono text-[11px] uppercase tracking-[0.12em] text-ink-muted transition hover:text-ink"
@@ -115,7 +119,7 @@ export default function LandingPage() {
             you prescribe it.
           </h1>
           <p className="mt-6 max-w-readable text-[15px] leading-relaxed text-ink-muted">
-            TwinRx assembles a diabetes or hypertension history into one verified timeline, runs the
+            MAYOQ AI assembles a diabetes or hypertension history into one verified timeline, runs the
             proposed medication through deterministic clinical rules, and shows the result on a
             patient-specific twin — organ by organ, current state against projected scenario.
           </p>
@@ -155,7 +159,7 @@ export default function LandingPage() {
         <div className="rise" style={{ animationDelay: "140ms" }}>
           <HeroTwin />
           <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-faint">
-            Synthetic patient · illustrative scenario projection · hover to pause, click an organ
+            Synthetic patient · illustrative scenario projection · pick a day, click an organ
           </p>
         </div>
       </section>
@@ -187,7 +191,7 @@ export default function LandingPage() {
             A verified lab value and a model&rsquo;s guess should never look the same.
           </h2>
           <p className="mt-4 max-w-readable text-[15px] leading-relaxed text-ink-muted">
-            Every fact in TwinRx carries its grade, everywhere it appears. Nothing enters the
+            Every fact in MAYOQ AI carries its grade, everywhere it appears. Nothing enters the
             verified patient snapshot until a doctor has approved it.
           </p>
         </Reveal>
@@ -284,7 +288,7 @@ export default function LandingPage() {
             {[
               {
                 title: "It does not prescribe",
-                body: "TwinRx proposes nothing on its own. A doctor enters the plan, reviews the analysis and records the decision.",
+                body: "MAYOQ AI proposes nothing on its own. A doctor enters the plan, reviews the analysis and records the decision.",
               },
               {
                 title: "It does not predict your future",
@@ -353,7 +357,7 @@ export default function LandingPage() {
         </Reveal>
 
         <p className="mt-10 max-w-readable text-xs leading-relaxed text-ink-faint">
-          TwinRx is an AI-assisted decision-support system. It does not independently prescribe
+          MAYOQ AI is an AI-assisted decision-support system. It does not independently prescribe
           medication, replace a doctor, or present a prediction as a confirmed diagnosis. Demo data
           shown on this page is synthetic.
         </p>

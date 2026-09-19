@@ -12,7 +12,36 @@ import { changePassword, login, refreshAccessToken, registerClinic, revokeAllSes
 
 export const authRouter = Router();
 
-const authRateLimit = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false });
+/**
+ * Brute-force protection for the credential endpoints. Only *failed* attempts
+ * count: a clinic demoing on one shared IP, or a doctor signing in on a second
+ * device, was previously spending the same budget as an attacker and getting
+ * locked out of a working password.
+ */
+const authRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  skipSuccessfulRequests: true,
+  standardHeaders: true,
+  legacyHeaders: false,
+  // The client reads `error` off a JSON body. The limiter's default plain-text
+  // reply parsed as nothing, so a throttled sign-in surfaced to the clinician
+  // as "Request failed" with no hint that waiting would fix it.
+  message: { error: "Too many sign-in attempts. Try again in a few minutes." },
+});
+
+/**
+ * Refreshing is not a credential guess, so it gets its own budget. Sharing the
+ * login limiter meant a long session could exhaust it and then be unable to
+ * sign back in — the lockout looked exactly like a broken login page.
+ */
+const refreshRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 240,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Session refresh is temporarily throttled. Try again shortly." },
+});
 
 authRouter.post("/register-clinic", authRateLimit, async (req, res, next) => {
   try {
@@ -69,7 +98,7 @@ authRouter.post("/login", authRateLimit, async (req, res, next) => {
   }
 });
 
-authRouter.post("/refresh", authRateLimit, async (req, res, next) => {
+authRouter.post("/refresh", refreshRateLimit, async (req, res, next) => {
   try {
     const input = refreshSchema.parse(req.body);
     const tokens = await refreshAccessToken(input.refreshToken);

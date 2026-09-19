@@ -1,17 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { AppShell } from "@/components/ui/app-shell";
+import { AppShell, PATIENT_NAV } from "@/components/ui/app-shell";
 import { api } from "@/lib/api-client";
-
-const NAV = [
-  { href: "/patient/dashboard", label: "Dashboard" },
-  { href: "/patient/history", label: "History" },
-  { href: "/patient/diagnoses", label: "Diagnoses" },
-  { href: "/patient/medications", label: "Medications" },
-  { href: "/patient/digital-twin", label: "Digital twin" },
-  { href: "/patient/chat", label: "Chat" },
-];
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -56,7 +47,7 @@ export default function PatientChatPage() {
   }
 
   return (
-    <AppShell role="PATIENT" navItems={NAV}>
+    <AppShell role="PATIENT" navItems={PATIENT_NAV}>
       <h1 className="mb-2 text-2xl font-semibold text-ink">Health assistant</h1>
       <p className="mb-4 text-xs text-ink-faint">
         AI-generated educational answers only. Not a substitute for your clinician. In an emergency, contact emergency

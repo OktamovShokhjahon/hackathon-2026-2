@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AppShell } from "@/components/ui/app-shell";
+import { AppShell, ADMIN_NAV } from "@/components/ui/app-shell";
 import { RiskBadge } from "@/components/ui/risk-badge";
 import {
   DistributionBars,
@@ -19,14 +19,6 @@ import { AnalysisTrend, type TrendPoint } from "@/components/charts/analysis-tre
 import { api } from "@/lib/api-client";
 import { formatDateTime } from "@/lib/format";
 import type { RiskColor } from "@/components/digital-twin/types";
-
-const NAV = [
-  { href: "/admin/dashboard", label: "Dashboard" },
-  { href: "/admin/doctors", label: "Doctors" },
-  { href: "/admin/patients", label: "Patients" },
-  { href: "/admin/audit", label: "Audit log" },
-  { href: "/admin/subscription", label: "Subscription" },
-];
 
 interface DashboardData {
   activeDoctors: number;
@@ -69,7 +61,7 @@ export default function AdminDashboardPage() {
   );
 
   return (
-    <AppShell role="ADMIN" navItems={NAV}>
+    <AppShell role="ADMIN" navItems={ADMIN_NAV}>
       <PageHeader
         eyebrow="Clinic console"
         title="How the clinic is running"

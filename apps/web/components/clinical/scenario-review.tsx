@@ -35,7 +35,7 @@ const DECISIONS: Array<{ value: Decision; label: string; hint: string; tone: str
 ];
 
 /**
- * The step the analysis exists for. Nothing in TwinRx decides anything: the
+ * The step the analysis exists for. Nothing in MAYOQ AI decides anything: the
  * rules produce a finding, the model puts it into words, and then a named
  * clinician records what they are doing about it. Until that happens the
  * patient sees nothing at all — publishing is a separate, deliberate tick, so
