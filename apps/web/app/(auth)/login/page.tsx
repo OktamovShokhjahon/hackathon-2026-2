@@ -7,6 +7,8 @@ import { motion } from "framer-motion";
 import { api, ApiError } from "@/lib/api-client";
 import { useAuthStore } from "@/lib/auth-store";
 import { Mark } from "@/components/ui/app-shell";
+import { LanguageSwitcher } from "@/components/ui/language-switcher";
+import { useI18n } from "@/lib/i18n";
 
 interface LoginResponse {
   accessToken: string;
@@ -43,6 +45,7 @@ const fieldClass =
 
 export default function LoginPage() {
   const router = useRouter();
+  const { t } = useI18n();
   const setSession = useAuthStore((s) => s.setSession);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -64,9 +67,9 @@ export default function LoginPage() {
       setError(
         err instanceof ApiError
           ? err.status === 401
-            ? "That email and password do not match an account."
+            ? t("login.badCredentials")
             : err.message
-          : "Could not reach the server. Check that the API is running.",
+          : t("login.noServer"),
       );
     } finally {
       setLoading(false);
@@ -88,18 +91,21 @@ export default function LoginPage() {
       >
         <form onSubmit={(event) => { event.preventDefault(); signIn(email, password); }} className="panel flex flex-col gap-5 p-8">
           <div>
-            <Link href="/" className="flex items-center gap-2">
-              <Mark className="h-4 w-4" />
-              <span className="readout">TwinRx</span>
-            </Link>
-            <h1 className="display mt-3 text-[26px] leading-tight text-ink">Sign in</h1>
+            <div className="flex items-center justify-between gap-3">
+              <Link href="/" className="flex items-center gap-2">
+                <Mark className="h-4 w-4" />
+                <span className="readout">MAYOQ AI</span>
+              </Link>
+              <LanguageSwitcher />
+            </div>
+            <h1 className="display mt-3 text-[26px] leading-tight text-ink">{t("login.title")}</h1>
             <p className="mt-1.5 text-[13px] text-ink-muted">
-              Clinic staff and patients use the same door; what you see depends on your role.
+              {t("login.subtitle")}
             </p>
           </div>
 
           <label className="flex flex-col gap-1.5">
-            <span className="readout">Email</span>
+            <span className="readout">{t("login.email")}</span>
             <input
               type="email"
               required
@@ -113,13 +119,13 @@ export default function LoginPage() {
 
           <label className="flex flex-col gap-1.5">
             <span className="flex items-center justify-between">
-              <span className="readout">Password</span>
+              <span className="readout">{t("login.password")}</span>
               <button
                 type="button"
                 onClick={() => setShowPassword((value) => !value)}
                 className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-faint transition hover:text-ink"
               >
-                {showPassword ? "Hide" : "Show"}
+                {showPassword ? t("login.hide") : t("login.show")}
               </button>
             </span>
             <input
@@ -144,20 +150,20 @@ export default function LoginPage() {
             disabled={loading}
             className="mt-1 rounded-md bg-electric px-4 py-2.5 text-sm font-medium text-white transition hover:bg-electric/90 disabled:opacity-60"
           >
-            {loading ? "Signing in…" : "Sign in"}
+            {loading ? t("login.signingIn") : t("action.signIn")}
           </button>
 
           <p className="text-center text-[13px] text-ink-muted">
-            Registering a clinic?{" "}
+            {t("login.registerPrompt")}{" "}
             <Link href="/register" className="text-signal hover:underline">
-              Start the 7-day demo
+              {t("login.registerLink")}
             </Link>
           </p>
         </form>
 
         {isLocalApi() && (
           <div className="panel-sunken mt-4 p-4">
-            <p className="readout">Demo clinic · synthetic data</p>
+            <p className="readout">{t("login.demoClinic")}</p>
             <ul className="mt-3 flex flex-col gap-1.5">
               {DEMO_ACCOUNTS.map((account) => (
                 <li key={account.email}>
@@ -178,8 +184,7 @@ export default function LoginPage() {
               ))}
             </ul>
             <p className="mt-3 text-[11px] leading-relaxed text-ink-faint">
-              Every patient in this clinic is fictional. Shown because the app is pointed at a local
-              API.
+              {t("login.demoNote")}
             </p>
           </div>
         )}

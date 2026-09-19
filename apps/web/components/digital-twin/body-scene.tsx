@@ -20,6 +20,12 @@ import type { OrganSignal, RiskColor } from "./types";
 
 export type TwinView = "front" | "back" | "left" | "right";
 
+/** Camera work the surrounding chrome can drive from outside the canvas. */
+export interface ZoomApi {
+  zoomBy: (factor: number) => void;
+  reset: () => void;
+}
+
 /** Organ present in the model but carrying no signal in this scenario. */
 const UNASSESSED_HEX = "#c3b0ad";
 
@@ -66,6 +72,8 @@ function Organ({
   organ,
   state,
   mixRef,
+  dissectRef,
+  siteRegistry,
   showAfter,
   reducedMotion,
   selected,
@@ -74,6 +82,9 @@ function Organ({
   organ: OrganDef;
   state: OrganState;
   mixRef: MutableRefObject<number>;
+  /** 0 at full-body distance, 1 fully dissected. Drives the exploded view. */
+  dissectRef: MutableRefObject<number>;
+  siteRegistry: MutableRefObject<Record<string, Array<THREE.Group | null>>>;
   showAfter: boolean;
   reducedMotion: boolean;
   selected: boolean;
@@ -83,11 +94,38 @@ function Organ({
   const [hovered, setHovered] = useState(false);
   const materials = useRef<THREE.MeshStandardMaterial[]>([]);
   const halos = useRef<THREE.MeshBasicMaterial[]>([]);
+  const siteRefs = useRef<Array<THREE.Group | null>>([]);
+  const cardRef = useRef<THREE.Group>(null);
+  // Published so the label projector can follow the exploded positions.
+  siteRegistry.current[organ.key] = siteRefs.current;
 
   const beforeColor = useMemo(() => colorFor(state.before), [state.before]);
   const afterColor = useMemo(() => colorFor(state.after), [state.after]);
   const scratch = useMemo(() => new THREE.Color(), []);
   const goalScale = useMemo(() => new THREE.Vector3(), []);
+  const scratchVector = useMemo(() => new THREE.Vector3(), []);
+
+  /**
+   * Where each site travels to when the body opens up. The direction is the
+   * site's own offset from the body axis, so an organ moves out along the line
+   * it already sits on and the arrangement still reads anatomically — an
+   * exploded plate, not a scatter. Paired organs push apart symmetrically
+   * because their offsets are already mirrored.
+   */
+  const explode = useMemo(
+    () =>
+      organ.sites.map((site) => {
+        const [x, y, z] = site.position;
+        const radial = new THREE.Vector3(x, 0, z);
+        // A site sitting on the axis has no direction of its own; send it
+        // forward, out of the torso, rather than leaving it buried.
+        if (radial.lengthSq() < 1e-6) radial.set(0, 0, 1);
+        radial.normalize();
+        // Lift with height so the stack fans open instead of forming a ring.
+        return radial.multiplyScalar(0.3).setY((y - 1.05) * 0.22);
+      }),
+    [organ.sites],
+  );
 
   useFrame(({ clock }) => {
     const mix = mixRef.current;
@@ -105,21 +143,51 @@ function Organ({
         : 0.5;
 
     const emphasis = selected || hovered ? 1.45 : 1;
-    const intensity = (assessed ? 0.22 + beat * 0.5 : 0.06) * emphasis;
+    const dissect = dissectRef.current;
+
+    // Close up the glow becomes the problem it solved: at full-body distance
+    // the emissive bloom is what makes a 2cm organ findable, but against a
+    // separated organ filling a third of the frame it is just haze over the
+    // surface. Both fall away as the view closes in.
+    const intensity = (assessed ? 0.22 + beat * 0.5 : 0.06) * emphasis * (1 - dissect * 0.72);
 
     for (const material of materials.current) {
       material.color.copy(scratch);
       material.emissive.copy(scratch);
       material.emissiveIntensity = intensity;
       material.opacity = assessed ? 1 : 0.85;
+      // A tighter, drier surface holds an edge that reads as a form.
+      material.roughness = 0.28 + dissect * 0.3;
     }
     for (const halo of halos.current) {
       halo.color.copy(scratch);
-      halo.opacity = (assessed ? 0.05 + beat * 0.08 : 0) * emphasis;
+      halo.opacity = (assessed ? 0.05 + beat * 0.08 : 0) * emphasis * (1 - dissect);
+    }
+
+    // Each site drifts out along its own line. Lerping rather than assigning
+    // means a flick of the wheel opens the body smoothly instead of snapping.
+    for (let index = 0; index < siteRefs.current.length; index += 1) {
+      const site = siteRefs.current[index];
+      const offset = explode[index];
+      if (!site || !offset) continue;
+      const base = organ.sites[index].position;
+      site.position.lerp(
+        scratchVector.set(
+          base[0] + offset.x * dissect,
+          base[1] + offset.y * dissect,
+          base[2] + offset.z * dissect,
+        ),
+        0.18,
+      );
+      // The hover card rides the first site.
+      if (index === 0) cardRef.current?.position.copy(site.position);
     }
 
     if (groupRef.current) {
-      const goal = selected || hovered ? 1.14 : 1;
+      // Only an explicit selection resizes an organ. Hover leaves the geometry
+      // still — a body that flinches under the cursor reads as an animation,
+      // not as anatomy, and it makes small organs harder to aim at.
+      const goal = selected ? 1.14 : 1;
       goalScale.set(goal, goal, goal);
       groupRef.current.scale.lerp(goalScale, 0.15);
     }
@@ -127,6 +195,7 @@ function Organ({
 
   materials.current = [];
   halos.current = [];
+  siteRefs.current = [];
 
   // The card reports the state the viewer is looking at, not a fixed side of
   // the morph — otherwise it can contradict the organ's own colour.
@@ -154,7 +223,14 @@ function Organ({
       }}
     >
       {organ.sites.map((site, index) => (
-        <group key={index} position={site.position} rotation={site.rotation ?? [0, 0, 0]}>
+        <group
+          key={index}
+          ref={(node: THREE.Group | null) => {
+            siteRefs.current[index] = node;
+          }}
+          position={site.position}
+          rotation={site.rotation ?? [0, 0, 0]}
+        >
           <mesh geometry={organGeometry(organ.key, index === 1)} renderOrder={0}>
             <meshStandardMaterial
               ref={(material: THREE.MeshStandardMaterial | null) => {
@@ -183,9 +259,11 @@ function Organ({
         </group>
       ))}
 
+      {/* Tracks the first site, so the card travels with its organ once the
+          body opens up rather than staying at the authored coordinate. */}
       {hovered && (
+        <group ref={cardRef} position={organ.sites[0].position}>
         <Html
-          position={organ.sites[0].position}
           center
           distanceFactor={2.2}
           zIndexRange={[30, 0]}
@@ -229,6 +307,7 @@ function Organ({
             )}
           </div>
         </Html>
+        </group>
       )}
     </group>
   );
@@ -263,13 +342,17 @@ function Projector({
   organs,
   groupRef,
   projection,
+  sites,
 }: {
   organs: OrganDef[];
   groupRef: MutableRefObject<THREE.Group | null>;
   projection: MutableRefObject<Projection>;
+  /** Live site groups per organ, so labels track the exploded positions. */
+  sites: MutableRefObject<Record<string, Array<THREE.Group | null>>>;
 }) {
   const { camera, size } = useThree();
   const point = useMemo(() => new THREE.Vector3(), []);
+  const world = useMemo(() => new THREE.Vector3(), []);
 
   useFrame(() => {
     const group = groupRef.current;
@@ -277,13 +360,27 @@ function Projector({
 
     for (const organ of organs) {
       // Paired organs report their midpoint, so one label serves both.
-      point.set(0, 0, 0);
-      for (const site of organ.sites) {
-        point.x += site.position[0] / organ.sites.length;
-        point.y += site.position[1] / organ.sites.length;
-        point.z += site.position[2] / organ.sites.length;
+      const live = sites.current[organ.key];
+      const usable = live?.filter(Boolean) as THREE.Group[] | undefined;
+
+      if (usable && usable.length === organ.sites.length) {
+        // Read where the organ actually is, not where it was authored: the
+        // body opens up as the camera closes in, and a label left at the
+        // original coordinate would point into empty space.
+        point.set(0, 0, 0);
+        for (const site of usable) {
+          site.getWorldPosition(world);
+          point.addScaledVector(world, 1 / usable.length);
+        }
+      } else {
+        point.set(0, 0, 0);
+        for (const site of organ.sites) {
+          point.x += site.position[0] / organ.sites.length;
+          point.y += site.position[1] / organ.sites.length;
+          point.z += site.position[2] / organ.sites.length;
+        }
+        group.localToWorld(point);
       }
-      group.localToWorld(point);
       point.project(camera);
 
       projection.current[organ.key] = {
@@ -297,15 +394,33 @@ function Projector({
   return null;
 }
 
+/** Distance at which the body is whole, and the closest the camera may come. */
+export const FULL_BODY_DISTANCE = 2.45;
+export const CLOSEST_DISTANCE = 0.85;
+
+/** 0 while the whole body is in frame, easing to 1 once it is fully opened. */
+function dissectionFor(distance: number): number {
+  const start = 1.95;
+  const end = 1.15;
+  const t = (start - distance) / (start - end);
+  const clamped = Math.min(1, Math.max(0, t));
+  // Smoothstep, so the body does not lurch open the instant you touch the wheel.
+  return clamped * clamped * (3 - 2 * clamped);
+}
+
 function CameraRig({ view }: { view: TwinView }) {
   const { camera } = useThree();
   const goal = useMemo(() => new THREE.Vector3(...CAMERA_PRESETS.front), []);
   const settling = useRef(false);
 
   useEffect(() => {
-    goal.set(...CAMERA_PRESETS[view]);
+    // Turning the body must not undo the zoom, so a view change re-aims the
+    // camera along the new axis while keeping the distance the viewer chose.
+    const preset = new THREE.Vector3(...CAMERA_PRESETS[view]);
+    const distance = camera.position.distanceTo(TARGET) || FULL_BODY_DISTANCE;
+    goal.copy(preset).sub(TARGET).normalize().multiplyScalar(distance).add(TARGET);
     settling.current = true;
-  }, [view, goal]);
+  }, [view, goal, camera]);
 
   useFrame(() => {
     if (!settling.current) return;
@@ -313,6 +428,61 @@ function CameraRig({ view }: { view: TwinView }) {
     camera.lookAt(TARGET);
     if (camera.position.distanceTo(goal) < 0.02) settling.current = false;
   });
+
+  return null;
+}
+
+/**
+ * Publishes how far in the camera is, as both the raw dissection value the
+ * scene animates against and a rounded step the surrounding UI can label.
+ */
+function ZoomReporter({
+  dissectRef,
+  onZoomChange,
+  controlsRef,
+}: {
+  dissectRef: MutableRefObject<number>;
+  onZoomChange?: (zoom: number) => void;
+  controlsRef: MutableRefObject<ZoomApi | null>;
+}) {
+  const { camera } = useThree();
+  const lastReported = useRef(-1);
+
+  useFrame(() => {
+    const distance = camera.position.distanceTo(TARGET);
+    dissectRef.current = dissectionFor(distance);
+
+    const zoom = FULL_BODY_DISTANCE / Math.max(distance, 0.0001);
+    const rounded = Math.round(zoom * 20) / 20;
+    if (rounded !== lastReported.current) {
+      lastReported.current = rounded;
+      onZoomChange?.(rounded);
+    }
+  });
+
+  // The zoom buttons live in the surrounding chrome, outside the canvas, so
+  // the camera work they need is published here rather than duplicated there.
+  useEffect(() => {
+    controlsRef.current = {
+      zoomBy(factor: number) {
+        const direction = camera.position.clone().sub(TARGET);
+        const next = Math.min(
+          FULL_BODY_DISTANCE,
+          Math.max(CLOSEST_DISTANCE, direction.length() / factor),
+        );
+        camera.position.copy(direction.normalize().multiplyScalar(next).add(TARGET));
+        camera.lookAt(TARGET);
+      },
+      reset() {
+        const direction = camera.position.clone().sub(TARGET).normalize();
+        camera.position.copy(direction.multiplyScalar(FULL_BODY_DISTANCE).add(TARGET));
+        camera.lookAt(TARGET);
+      },
+    };
+    return () => {
+      controlsRef.current = null;
+    };
+  }, [camera, controlsRef]);
 
   return null;
 }
@@ -366,6 +536,8 @@ export function BodyScene({
   selectedOrgan,
   onSelectOrgan,
   projection,
+  zoomApi,
+  onZoomChange,
 }: {
   beforeSignals: OrganSignal[];
   afterSignals: OrganSignal[];
@@ -377,9 +549,14 @@ export function BodyScene({
   selectedOrgan: string | null;
   onSelectOrgan: (key: string | null) => void;
   projection: MutableRefObject<Projection>;
+  zoomApi?: MutableRefObject<ZoomApi | null>;
+  onZoomChange?: (zoom: number) => void;
 }) {
   const organs = useMemo(() => organsFor(sex), [sex]);
   const turntableRef = useRef<THREE.Group | null>(null);
+  const dissectRef = useRef(0);
+  const siteRegistry = useRef<Record<string, Array<THREE.Group | null>>>({});
+  const fallbackZoomApi = useRef<ZoomApi | null>(null);
 
   const states = useMemo(
     () => buildStates(organs, beforeSignals, afterSignals),
@@ -408,10 +585,20 @@ export function BodyScene({
       <directionalLight position={[-2.5, 1.5, -1.5]} intensity={0.5} color="#dbe7f3" />
 
       <CameraRig view={view} />
-      <Projector organs={organs} groupRef={turntableRef} projection={projection} />
+      <ZoomReporter
+        dissectRef={dissectRef}
+        onZoomChange={onZoomChange}
+        controlsRef={zoomApi ?? fallbackZoomApi}
+      />
+      <Projector
+        organs={organs}
+        groupRef={turntableRef}
+        projection={projection}
+        sites={siteRegistry}
+      />
 
       <Turntable enabled={autoRotate && !reducedMotion} groupRef={turntableRef}>
-        <Ribcage />
+        <Ribcage dissectRef={dissectRef} />
         <Vasculature states={states} mixRef={mixRef} />
         {organs.map((organ) => (
           <Organ
@@ -419,6 +606,8 @@ export function BodyScene({
             organ={organ}
             state={states[organ.key]}
             mixRef={mixRef}
+            dissectRef={dissectRef}
+            siteRegistry={siteRegistry}
             showAfter={mix > 0.5}
             reducedMotion={reducedMotion}
             selected={selectedOrgan === organ.key}
@@ -426,14 +615,17 @@ export function BodyScene({
           />
         ))}
         {/* Shell last: it blends additively over the anatomy inside. */}
-        <BodyShell sex={sex} />
+        <BodyShell sex={sex} dissectRef={dissectRef} />
         <Platform />
       </Turntable>
 
       <OrbitControls
         target={TARGET}
         enablePan={false}
-        enableZoom={false}
+        enableZoom
+        zoomSpeed={0.7}
+        minDistance={CLOSEST_DISTANCE}
+        maxDistance={FULL_BODY_DISTANCE}
         minPolarAngle={Math.PI / 3.4}
         maxPolarAngle={Math.PI / 1.85}
       />

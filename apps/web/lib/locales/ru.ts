@@ -1,0 +1,140 @@
+import type { MessageKey } from "./uz";
+
+/** Russian. Typed against the Uzbek reference, so a gap fails the build. */
+export const ru: Record<MessageKey, string> = {
+  "app.tagline": "Поддержка клинических решений",
+  "nav.dashboard": "Панель",
+  "nav.patients": "Пациенты",
+  "nav.alerts": "Оповещения",
+  "nav.doctors": "Врачи",
+  "nav.audit": "Журнал аудита",
+  "nav.subscription": "Подписка",
+  "nav.history": "История",
+  "nav.diagnoses": "Диагнозы",
+  "nav.medications": "Лекарства",
+  "nav.digitalTwin": "Цифровой двойник",
+  "nav.chat": "Чат",
+  "nav.menu": "Меню",
+  "nav.toggle": "Открыть навигацию",
+
+  "role.admin": "Администратор клиники",
+  "role.doctor": "Врач",
+  "role.patient": "Пациент",
+
+  "action.signIn": "Войти",
+  "action.signOut": "Выйти",
+  "action.cancel": "Отмена",
+  "action.add": "Добавить",
+  "action.close": "Закрыть",
+
+  "theme.day": "День",
+  "theme.night": "Ночь",
+  "theme.toDay": "Переключить на дневной режим",
+  "theme.toNight": "Переключить на ночной режим",
+
+  "lang.label": "Язык",
+  "lang.uz": "O'zbekcha",
+  "lang.en": "English",
+  "lang.ru": "Русский",
+
+  "twin.zoomIn": "Приблизить",
+  "twin.zoomOut": "Отдалить",
+  "twin.fit": "По размеру",
+  "twin.front": "Спереди",
+  "twin.back": "Сзади",
+  "twin.left": "Слева",
+  "twin.right": "Справа",
+  "twin.current": "СЕЙЧАС",
+  "twin.projected": "ПРОГНОЗ",
+  "twin.day": "ДЕНЬ",
+  "twin.horizon": "Горизонт прогноза",
+  "twin.playing": "Воспроизводится",
+  "twin.play": "Воспроизвести",
+  "twin.today": "Сегодня",
+  "twin.dayN": "День {n}",
+  "twin.separated": "Органы разделены",
+  "twin.wholeBody": "Всё тело",
+  "twin.zoomHint": "Приблизьте для раздельного вида",
+
+  "login.title": "Вход",
+  "login.subtitle":
+    "Сотрудники клиники и пациенты входят через одну дверь; что вы увидите, зависит от вашей роли.",
+  "login.email": "Электронная почта",
+  "login.password": "Пароль",
+  "login.show": "Показать",
+  "login.hide": "Скрыть",
+  "login.signingIn": "Выполняется вход…",
+  "login.badCredentials": "Эта почта и пароль не соответствуют ни одной учётной записи.",
+  "login.noServer": "Не удалось связаться с сервером. Проверьте, запущен ли API.",
+  "login.registerPrompt": "Регистрируете клинику?",
+  "login.registerLink": "Начните 7-дневное демо",
+  "login.demoClinic": "Демо-клиника · синтетические данные",
+  "login.demoNote":
+    "Каждый пациент в этой клинике вымышленный. Показано, потому что приложение обращается к локальному API.",
+
+  "chart.tabChart": "Карта",
+  "chart.tabAnalysis": "Анализ",
+  "chart.tabPrevention": "Профилактика",
+  "chart.tabDocuments": "Документы",
+  "chart.eyebrow": "Карта пациента",
+  "chart.diagnoses": "Диагнозы",
+  "chart.medications": "Лекарства",
+  "chart.pastHistory": "Прошлая история",
+  "chart.pastHistoryBody":
+    "Запишите более раннее событие — прошлый диагноз, процедуру или результат анализа — чтобы правила читали полную хронологию, а не только то, что произошло здесь.",
+  "chart.noDiagnoses": "Диагнозов пока нет",
+  "chart.noDiagnosesBody":
+    "Добавьте один. Он раскрывается в клинический контекст, который вы проверяете и утверждаете.",
+  "chart.noMedications": "Лекарств пока нет",
+  "chart.noMedicationsBody":
+    "Добавьте предлагаемое лекарство, затем изучите его инструкцию перед назначением.",
+  "chart.reference": "Справка",
+  "chart.patientCode": "Код пациента",
+  "chart.status": "Статус",
+  "chart.phone": "Телефон",
+
+  "analysis.whatToAnalyse": "Что анализировать",
+  "analysis.overWhatPeriod": "За какой период",
+  "analysis.nothingYet": "Пока нечего анализировать",
+  "analysis.nothingYetBody":
+    "Для анализа нужен хотя бы один диагноз и одно лекарство в карте.",
+  "analysis.goToChart": "Перейти к карте",
+  "analysis.run": "Запустить анализ на {n} дней",
+  "analysis.running": "Выполняется…",
+  "analysis.rulesFirst":
+    "Сначала работают детерминированные правила; модель лишь объясняет результат.",
+  "analysis.selectPrompt": "Выберите выше хотя бы один диагноз и одно лекарство.",
+  "analysis.customDates": "Свои даты",
+  "analysis.usePreset": "Использовать готовый период",
+  "analysis.from": "С",
+  "analysis.to": "По",
+  "analysis.days": "{n} дней",
+  "analysis.oneYear": "1 год",
+  "analysis.latestProjection": "Последний прогноз",
+  "analysis.failed": "Анализ не удалось выполнить",
+
+  "prevention.heading": "На шаг впереди",
+  "prevention.label": "План профилактики",
+  "prevention.intro":
+    "Построен на значениях, подтверждённых вашим врачом. Это только привычки и визиты — ничто здесь не меняет ваши лекарства, это может сделать только врач.",
+  "prevention.dailyRoutine": "Распорядок дня",
+  "prevention.ifYouKeep": "Если вы будете этого придерживаться",
+  "prevention.measuredBy": "Чем измеряется:",
+  "prevention.guardsAgainst": "От чего защищает:",
+  "prevention.sharpen": "Что сделает это точнее",
+  "prevention.sharpenBody":
+    "Этих значений нет в карте, поэтому всё, что от них зависит, не угадывается, а опускается: {list}.",
+  "prevention.none": "Сейчас ни одна программа профилактики не подходит вашей карте.",
+  "prevention.noneBody":
+    "Это не то же самое, что заключение о здоровье — это значит, что подтверждённые записи пока не пересекают ни один порог из этого каталога.",
+  "prevention.stillMissing": "Всё ещё отсутствует:",
+  "prevention.catalogue":
+    "Каталог профилактики {version} · построен только на подтверждённых записях",
+  "prevention.failed":
+    "Не удалось загрузить план профилактики. С вашей картой всё в порядке — попробуйте через мгновение.",
+
+  "time.morning": "Утром",
+  "time.midday": "Днём",
+  "time.evening": "Вечером",
+  "time.anytime": "В любое время",
+};

@@ -31,6 +31,15 @@ export function Modal({
   const titleId = useId();
   const descriptionId = useId();
 
+  // Callers declare `onClose` inline, so its identity changes on every render —
+  // including the re-render caused by typing a character. Reading it through a
+  // ref keeps the effect below tied to `open` alone; depending on the callback
+  // directly tore the dialog down and refocused the first field on a keystroke.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
+
   // The portal can only exist after mount. Testing for `document` instead would
   // render nothing on the server but a full dialog on the very first client
   // render, which fails hydration whenever a modal starts open.
@@ -52,12 +61,20 @@ export function Modal({
         ) ?? [],
       );
 
-    const timer = window.setTimeout(() => focusables()[0]?.focus(), 0);
+    // Prefer the first field over the first focusable. The close button sits
+    // ahead of the body in DOM order, so "first focusable" put the cursor on
+    // ✕ and silently dropped whatever the clinician typed next.
+    const firstField = () =>
+      panelRef.current?.querySelector<HTMLElement>(
+        'input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled])',
+      ) ?? focusables()[0];
+
+    const timer = window.setTimeout(() => firstField()?.focus(), 0);
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (event.key !== "Tab") return;
@@ -83,7 +100,7 @@ export function Modal({
       window.clearTimeout(timer);
       restoreFocusTo.current?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!mounted || !open) return null;
 

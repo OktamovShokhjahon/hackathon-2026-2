@@ -2,21 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AppShell } from "@/components/ui/app-shell";
+import { AppShell, PATIENT_NAV } from "@/components/ui/app-shell";
 import { RiskBadge } from "@/components/ui/risk-badge";
 import { DigitalTwinViewer } from "@/components/digital-twin/digital-twin-viewer";
 import { api } from "@/lib/api-client";
 import type { OrganSignal } from "@/components/digital-twin/types";
 import { twinSex } from "@/components/digital-twin/anatomy";
-
-const NAV = [
-  { href: "/patient/dashboard", label: "Dashboard" },
-  { href: "/patient/history", label: "History" },
-  { href: "/patient/diagnoses", label: "Diagnoses" },
-  { href: "/patient/medications", label: "Medications" },
-  { href: "/patient/digital-twin", label: "Digital twin" },
-  { href: "/patient/chat", label: "Chat" },
-];
 
 interface Scenario {
   _id: string;
@@ -55,7 +46,7 @@ export default function PatientDigitalTwinPage() {
     data?.find((item) => item.horizonDays === horizon) ?? data?.[0] ?? null;
 
   return (
-    <AppShell role="PATIENT" navItems={NAV}>
+    <AppShell role="PATIENT" navItems={PATIENT_NAV}>
       <div className="max-w-5xl">
         <span className="readout">Your digital twin</span>
         <h1 className="display mt-2 text-[30px] leading-tight text-ink">

@@ -9,6 +9,7 @@ import { MedicalRecord } from "../medical-records/medical-record.model";
 import { Diagnosis } from "../diagnoses/diagnosis.model";
 import { Medication } from "../medications/medication.model";
 import { TreatmentScenario } from "../ai-analysis/treatment-scenario.model";
+import { getPreventionPlanForPatient } from "../prevention/prevention.service";
 
 export const meRouter = Router();
 meRouter.use(requireAuth, requireRole("PATIENT"));
@@ -77,6 +78,22 @@ meRouter.get("/approved-scenarios", async (req, res, next) => {
       "doctorReview.visibleToPatient": true,
     }).sort({ createdAt: -1 });
     res.json(scenarios);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * The patient's prevention plan. Unlike a treatment scenario this needs no
+ * doctor approval to be shown, because the catalog behind it cannot say
+ * anything about medication — see `prevention-catalog.ts`. It is built only
+ * from values a doctor has already verified.
+ */
+meRouter.get("/prevention-plan", async (req, res, next) => {
+  try {
+    const profile = await getOwnProfile(req.auth!.userId, req.auth!.tenantId);
+    const plan = await getPreventionPlanForPatient(req.auth!.tenantId, String(profile._id));
+    res.json(plan);
   } catch (err) {
     next(err);
   }

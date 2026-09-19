@@ -9,7 +9,6 @@ export default function RegisterClinicPage() {
   const router = useRouter();
   const [form, setForm] = useState({
     clinicName: "",
-    contactEmail: "",
     adminFullName: "",
     adminEmail: "",
     password: "",
@@ -48,7 +47,6 @@ export default function RegisterClinicPage() {
         <h1 className="display text-[26px] leading-tight text-ink">Start your 7-day clinic demo</h1>
         {[
           { key: "clinicName", label: "Clinic name" },
-          { key: "contactEmail", label: "Clinic contact email", type: "email" },
           { key: "adminFullName", label: "Your full name" },
           { key: "adminEmail", label: "Your email", type: "email" },
           { key: "password", label: "Password", type: "password" },

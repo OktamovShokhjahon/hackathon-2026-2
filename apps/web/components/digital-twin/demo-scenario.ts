@@ -106,3 +106,46 @@ export const DEMO_META = {
   sourceRecordCount: 14,
   stale: false,
 };
+
+/**
+ * Checkpoints the landing twin can be scrubbed to. `mix` is the blend between
+ * DEMO_BEFORE and DEMO_AFTER, so the organs recolour gradually rather than
+ * snapping between two states. Days are a real sequence, which is why they are
+ * numbered — the order is the information.
+ *
+ * Synthetic, like the rest of this scenario. The notes are written from the
+ * projection above so the caption can never contradict the organ colours.
+ */
+export interface TimelineStop {
+  day: number;
+  label: string;
+  mix: number;
+  note: string;
+}
+
+export const DEMO_TIMELINE: TimelineStop[] = [
+  {
+    day: 0,
+    label: "Today",
+    mix: 0,
+    note: "Baseline from verified records. HbA1c and blood pressure both sit above target.",
+  },
+  {
+    day: 30,
+    label: "Day 30",
+    mix: 1 / 3,
+    note: "Blood pressure starts moving toward target. Glycaemic change is not measurable yet.",
+  },
+  {
+    day: 60,
+    label: "Day 60",
+    mix: 2 / 3,
+    note: "Pressure control holds and HbA1c begins to fall. Renal labs are still outstanding.",
+  },
+  {
+    day: 90,
+    label: "Day 90",
+    mix: 1,
+    note: "Pressure reaches target range. HbA1c improves but stays above target, so the plan continues.",
+  },
+];

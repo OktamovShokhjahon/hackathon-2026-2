@@ -10,7 +10,7 @@ import type { JwtAccessPayload, Role } from "../../shared/types";
 
 export interface RegisterClinicInput {
   clinicName: string;
-  contactEmail: string;
+  contactEmail?: string;
   adminFullName: string;
   adminEmail: string;
   password: string;
@@ -60,7 +60,7 @@ export async function registerClinic(input: RegisterClinicInput) {
   const tenant = await Tenant.create({
     name: input.clinicName,
     slug,
-    contactEmail: input.contactEmail,
+    contactEmail: input.contactEmail ?? input.adminEmail,
     status: "active",
     trialEndsAt: new Date(Date.now() + env.demoTrialDays * 24 * 60 * 60 * 1000),
   });

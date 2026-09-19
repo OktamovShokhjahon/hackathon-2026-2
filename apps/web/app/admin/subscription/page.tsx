@@ -2,19 +2,11 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AppShell } from "@/components/ui/app-shell";
+import { AppShell, ADMIN_NAV } from "@/components/ui/app-shell";
 import { MetaItem, PageHeader, Panel, Skeleton } from "@/components/ui/console";
 import { useToast } from "@/components/ui/toast";
 import { api, ApiError } from "@/lib/api-client";
 import { formatDate, humanizeEnum } from "@/lib/format";
-
-const NAV = [
-  { href: "/admin/dashboard", label: "Dashboard" },
-  { href: "/admin/doctors", label: "Doctors" },
-  { href: "/admin/patients", label: "Patients" },
-  { href: "/admin/audit", label: "Audit log" },
-  { href: "/admin/subscription", label: "Subscription" },
-];
 
 interface SubscriptionData {
   plan: "DEMO" | "MONTHLY" | "YEARLY";
@@ -95,7 +87,7 @@ export default function AdminSubscriptionPage() {
   });
 
   return (
-    <AppShell role="ADMIN" navItems={NAV}>
+    <AppShell role="ADMIN" navItems={ADMIN_NAV}>
       <PageHeader
         eyebrow="Billing"
         title="Subscription"

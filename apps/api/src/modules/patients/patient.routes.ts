@@ -13,6 +13,7 @@ import { diagnosisRouter } from "../diagnoses/diagnosis.routes";
 import { medicationRouter, allergyRouter } from "../medications/medication.routes";
 import { treatmentScenarioRouter } from "../ai-analysis/treatment-scenario.routes";
 import { documentUploadRouter } from "../documents/document.routes";
+import { getPreventionPlanForPatient } from "../prevention/prevention.service";
 
 export const patientRouter = Router();
 
@@ -64,6 +65,19 @@ patientRouter.get("/:patientId", requireRole("DOCTOR", "ADMIN"), async (req, res
   try {
     const result = await getPatientById(req.auth!.tenantId, req.params.patientId);
     res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * The same prevention plan the patient sees, so a doctor is never surprised by
+ * advice their patient was given. Doctors only — an admin has no clinical view.
+ */
+patientRouter.get("/:patientId/prevention-plan", requireRole("DOCTOR"), async (req, res, next) => {
+  try {
+    const plan = await getPreventionPlanForPatient(req.auth!.tenantId, req.params.patientId);
+    res.json(plan);
   } catch (err) {
     next(err);
   }
