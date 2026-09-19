@@ -1,20 +1,42 @@
 import { z } from "zod";
-import { callGroqStructured } from "../ai-analysis/groq.client";
+import { callGeminiStructured } from "../ai-analysis/gemini.client";
 import { HttpError } from "../../middleware/errorHandler";
 import { ChatConversation } from "./chat-conversation.model";
 import { PatientProfile } from "../patients/patient.model";
 import { Diagnosis } from "../diagnoses/diagnosis.model";
 import { Medication } from "../medications/medication.model";
 
-const EMERGENCY_PATTERNS =
-  /(chest pain|difficulty breathing|can't breathe|cannot breathe|severe bleeding|suicidal|loss of consciousness|stroke|numbness on one side|blue lips)/i;
+// Emergency wording in every language the interface supports. A patient who
+// writes in Russian or Uzbek must trip the same guard as one who writes in
+// English; the model is also told to treat any language this way.
+const EMERGENCY_PATTERNS = {
+  en: /chest pain|difficulty breathing|can't breathe|cannot breathe|severe bleeding|suicidal|loss of consciousness|stroke|numbness on one side|blue lips/i,
+  ru: /боль в груди|не могу дышать|трудно дышать|сильное кровотечение|потеря сознания|потерял сознание|инсульт|суицид|онемение (?:с одной стороны|половины)|синие губы/i,
+  uz: /ko['ʻ’]?krak og['ʻ’]?rig['ʻ’]?i|nafas ololmayapman|nafas qisil|kuchli qon ketish|hushimdan ketdim|hushidan ketdi|insult|o['ʻ’]?z joniga qasd|lablari ko['ʻ’]?k/i,
+} as const;
+
+// Shown in the language the matching pattern belongs to, so the warning is
+// readable by the person who needs it.
+const EMERGENCY_REPLIES: Record<keyof typeof EMERGENCY_PATTERNS, string> = {
+  en: "This may describe a medical emergency. Please contact your local emergency services or go to the nearest emergency department immediately. This chatbot cannot handle emergencies.",
+  ru: "Возможно, это неотложное состояние. Немедленно позвоните в скорую помощь или обратитесь в ближайшее отделение неотложной помощи. Этот чат-бот не может помочь при неотложных состояниях.",
+  uz: "Bu shoshilinch holat bo'lishi mumkin. Darhol tez yordamga qo'ng'iroq qiling yoki eng yaqin shoshilinch yordam bo'limiga boring. Bu chatbot shoshilinch holatlarda yordam bera olmaydi.",
+};
+
+function detectEmergency(message: string): keyof typeof EMERGENCY_PATTERNS | null {
+  // Script decides first: Cyrillic text is Russian even if a Latin word matches.
+  const order = /[а-яё]/i.test(message) ? (["ru", "en", "uz"] as const) : (["en", "uz", "ru"] as const);
+  return order.find((lang) => EMERGENCY_PATTERNS[lang].test(message)) ?? null;
+}
+
+const HISTORY_TURNS = 6;
 
 const CHAT_RESPONSE_SCHEMA = z.object({
   reply: z.string(),
   isEducationalOnly: z.literal(true),
 });
 
-const PROMPT_VERSION = "patient-chatbot@1";
+const PROMPT_VERSION = "patient-chatbot@2";
 
 export async function sendChatMessage(params: {
   tenantId: string;
@@ -23,9 +45,9 @@ export async function sendChatMessage(params: {
   conversationId?: string;
   message: string;
 }) {
-  if (EMERGENCY_PATTERNS.test(params.message)) {
-    const reply =
-      "This may describe a medical emergency. Please contact your local emergency services or go to the nearest emergency department immediately. This chatbot cannot handle emergencies.";
+  const emergencyLang = detectEmergency(params.message);
+  if (emergencyLang) {
+    const reply = EMERGENCY_REPLIES[emergencyLang];
     const conversation = await appendMessage(params, reply, true);
     return { conversation, isEmergency: true };
   }
@@ -45,15 +67,28 @@ export async function sendChatMessage(params: {
     }
   }
 
-  const result = await callGroqStructured({
+  // The last few turns, so a follow-up like "and when should I take it?" has
+  // something to refer to. Emergency replies are left out: they are canned text.
+  const previous = params.conversationId
+    ? await ChatConversation.findOne({ _id: params.conversationId, tenantId: params.tenantId, userId: params.userId })
+    : null;
+  const history = (previous?.messages ?? [])
+    .filter((m) => !m.isEmergencyFlag)
+    .slice(-HISTORY_TURNS)
+    .map((m) => ({ role: m.role, content: m.content }));
+
+  const result = await callGeminiStructured({
     systemPrompt:
       "You are TwinRx's educational health assistant. You must: " +
       "1) never diagnose or prescribe; 2) never change any medical record; " +
       "3) only use the approved patient context provided, never invent facts; " +
       "4) clearly state you are AI-generated and not a substitute for a clinician; " +
-      "5) refuse to reveal information about any other patient. " +
+      "5) refuse to reveal information about any other patient; " +
+      "6) reply in the same language the user wrote their latest message in, whatever that language is; " +
+      "7) if the message describes a medical emergency in any language, tell them to contact emergency services now. " +
       'Return strict JSON: {"reply": string, "isEducationalOnly": true}.',
-    userPrompt: JSON.stringify({ question: params.message, approvedContext }),
+    userPrompt: JSON.stringify({ previousMessages: history, question: params.message, approvedContext }),
+    tenantId: params.tenantId,
     schema: CHAT_RESPONSE_SCHEMA,
     promptVersion: PROMPT_VERSION,
     temperature: 0.3,

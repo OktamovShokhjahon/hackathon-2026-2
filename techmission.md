@@ -12,7 +12,7 @@
 | Frontend | Next.js, TypeScript, Tailwind CSS, shadcn/ui, Framer Motion, React Three Fiber |
 | Backend | Node.js, Express.js, TypeScript |
 | Database | MongoDB with Mongoose |
-| AI | Groq API with `gpt-oss-20b`, structured-output pipelines, deterministic clinical rules |
+| AI | Google Gemini API (`gemini-2.5-flash`, free tier), structured-output pipelines, deterministic clinical rules |
 | Deployment target | Docker-compatible cloud deployment |
 
 ## 2. Product Vision
@@ -43,7 +43,7 @@ TwinRx converts the available history into a structured patient timeline, analyz
 - Support three roles: `ADMIN`, `DOCTOR`, and `PATIENT`.
 - Allow doctors to build a patient profile incrementally.
 - Store diagnoses, medications, allergies, laboratory results, symptoms, procedures, and documents as a chronological history.
-- Analyze uploaded medical text, images, and documents using Groq and `gpt-oss-20b`.
+- Analyze uploaded medical text, images, and documents using Gemini (`gemini-2.5-flash`).
 - Detect possible medication-related risks and missing information.
 - Generate an explainable risk summary for doctor review.
 - Show a 3D patient visualization before and after a proposed treatment scenario.
@@ -391,7 +391,7 @@ For the hackathon demo, payment can use a mock provider while preserving the sam
 
 ### 9.1 AI Service Strategy
 
-Groq is the model gateway. `gpt-oss-20b` is used for structured extraction, normalization, explanation, and scenario summarization where supported by the selected Groq endpoint.
+Gemini is the model gateway. `gemini-2.5-flash` is used for structured extraction, normalization, explanation, and scenario summarization and, for scanned pages and photos, direct document reading.
 
 The platform must not call the model directly from the browser. All AI requests go through the Express backend.
 
@@ -404,7 +404,7 @@ Text extraction and normalization
         ↓
 PII-aware preprocessing and prompt construction
         ↓
-Groq + gpt-oss-20b structured extraction
+Gemini structured extraction
         ↓
 JSON Schema / Zod validation
         ↓
@@ -474,7 +474,7 @@ Example treatment-analysis output:
 
 ### 9.5 Failure and Fallback Mode
 
-If Groq or the AI model is unavailable:
+If Gemini or the AI model is unavailable:
 
 - preserve all manually entered data;
 - run deterministic checks that do not require the model;
@@ -948,7 +948,7 @@ The live demo should be optimized around three synthetic patients and a two-minu
 4. AI extracts candidate history with source references.
 5. Doctor verifies the extracted facts.
 6. Doctor adds a proposed medication scenario.
-7. The system runs deterministic checks plus Groq/gpt-oss-20b analysis.
+7. The system runs deterministic checks plus Gemini analysis.
 8. The dashboard shows red, yellow, and green organ signals.
 9. The 3D twin transitions from before to after.
 10. Doctor reviews and approves the patient-visible summary.
@@ -978,8 +978,8 @@ The demo must include an explicit AI-unavailable fallback mode and must clearly 
 
 ### Phase 3 — AI and Safety
 
-- Groq integration;
-- gpt-oss-20b structured extraction;
+- Gemini integration;
+- Gemini structured extraction;
 - output validation;
 - deterministic rule engine;
 - treatment scenario storage;
@@ -1023,8 +1023,8 @@ API_URL=http://localhost:4000
 MONGODB_URI=mongodb://localhost:27017/twinrx
 JWT_ACCESS_SECRET=replace_me
 JWT_REFRESH_SECRET=replace_me
-GROQ_API_KEY=replace_me
-GROQ_MODEL=openai/gpt-oss-20b
+GEMINI_API_KEY=replace_me
+GEMINI_MODEL=gemini-2.5-flash
 OBJECT_STORAGE_ENDPOINT=replace_me
 OBJECT_STORAGE_BUCKET=replace_me
 OBJECT_STORAGE_ACCESS_KEY=replace_me
@@ -1043,7 +1043,7 @@ The MVP is complete when:
 - an admin can create a doctor;
 - a doctor can create a patient and add history records one by one;
 - a doctor can upload a document and review AI-extracted facts;
-- the system can run a versioned treatment analysis using Groq and `gpt-oss-20b`;
+- the system can run a versioned treatment analysis using Gemini (`gemini-2.5-flash`);
 - deterministic rule checks run before AI explanation;
 - missing data and uncertainty are displayed;
 - the system produces a red/yellow/green risk summary;

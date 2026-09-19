@@ -302,8 +302,8 @@ export function DigitalTwinViewer({
         {/* Corner readout */}
         <div className="pointer-events-none absolute inset-x-4 top-4 flex items-start justify-between gap-3">
           <div className="flex flex-col gap-1">
-          <span className="readout">{t("twin.title")}</span>
-          <span className="font-mono text-[11px] tabular-nums text-signal">
+          <span className="readout !text-white/55">{t("twin.title")}</span>
+          <span className="font-mono text-[11px] tabular-nums text-[#5fd4e6]">
             {t("twin.horizonReadout", {
               state: (mix > 0.5 ? t("twin.after") : t("twin.before")).toUpperCase(),
               days: horizonDays,

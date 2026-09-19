@@ -42,6 +42,15 @@ export interface TreatmentScenarioDoc {
   /** Who wrote the narrative: the model, or a restatement of the rule output. */
   narrativeSource?: "model" | "rule_summary";
   /** False when the model was unreachable: the rule result still stands alone. */
+  /** Plain-language version for the patient. Hidden until a doctor approves it. */
+  patientSummary?: {
+    text: string;
+    modelId: string;
+    generatedAt: Date;
+    approved: boolean;
+    approvedBy?: Types.ObjectId;
+    approvedAt?: Date;
+  };
   aiAvailable: boolean;
   aiError?: string;
   disclaimer: string;
@@ -98,6 +107,14 @@ const treatmentScenarioSchema = new Schema<TreatmentScenarioDoc>(
     ruleSetVersion: { type: String, required: true },
     aiNarrative: { type: String },
     narrativeSource: { type: String, enum: ["model", "rule_summary"] },
+    patientSummary: {
+      text: String,
+      modelId: String,
+      generatedAt: Date,
+      approved: { type: Boolean, default: false },
+      approvedBy: { type: Schema.Types.ObjectId, ref: "User" },
+      approvedAt: Date,
+    },
     aiAvailable: { type: Boolean, default: false },
     aiError: { type: String },
     disclaimer: {

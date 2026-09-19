@@ -58,9 +58,24 @@ function heart(): THREE.BufferGeometry {
     v.z *= 0.82;
   });
   geometry.scale(0.052, 0.072, 0.05);
+  // Aorta and pulmonary trunk rising from the base, so it reads as a heart and
+  // not a rounded cone.
+  const aorta = taperedTube(
+    [[0.004, 0.05, 0.0], [0.006, 0.09, -0.004], [-0.014, 0.112, -0.012]],
+    [0.014, 0.012, 0.011],
+    14,
+    10,
+  );
+  const pulmonary = taperedTube(
+    [[-0.012, 0.045, 0.02], [-0.016, 0.085, 0.022], [-0.03, 0.1, 0.012]],
+    [0.012, 0.011, 0.009],
+    14,
+    10,
+  );
+  const combined = merge([geometry, aorta, pulmonary]);
   // The apex points down and towards the patient's left.
-  geometry.rotateZ(0.34);
-  return geometry;
+  combined.rotateZ(0.34);
+  return combined;
 }
 
 /** Lung: apex narrow, base domed, concave where it wraps the mediastinum. */
@@ -75,9 +90,22 @@ function lung(mirror: boolean): THREE.BufferGeometry {
     }
     if (v.y < -0.6) v.y = -0.6 + (v.y + 0.6) * 0.6;
     v.z *= 0.78;
+    // Oblique fissure: a shallow groove that splits the lung into lobes.
+    const groove = Math.exp(-Math.pow((v.y + v.z * 0.6 - 0.05) * 5.5, 2));
+    const k = 1 - groove * 0.09;
+    v.x *= k;
+    v.z *= k;
   });
   geometry.scale(0.056, 0.112, 0.056);
-  return geometry;
+  // Main bronchus entering the hilum on the medial face.
+  const towards = -side;
+  const bronchus = taperedTube(
+    [[towards * 0.03, 0.03, 0], [towards * 0.062, 0.058, 0], [towards * 0.09, 0.085, 0]],
+    [0.007, 0.006, 0.005],
+    12,
+    8,
+  );
+  return merge([geometry, bronchus]);
 }
 
 /* --------------------------------------------------------------- abdominal */
@@ -92,7 +120,11 @@ function liver(): THREE.BufferGeometry {
   });
   geometry.scale(0.088, 0.062, 0.062);
   geometry.rotateZ(-0.12);
-  return geometry;
+  // Gallbladder: a small pear hanging from the inferior surface.
+  const gallbladder = sphere(16);
+  gallbladder.scale(0.011, 0.02, 0.011);
+  gallbladder.translate(-0.012, -0.05, 0.026);
+  return merge([geometry, gallbladder]);
 }
 
 /** J-shape: fundus high on the patient's left, curving to the pylorus. */
@@ -194,9 +226,14 @@ function spine(): THREE.BufferGeometry {
     const z = Math.sin(t * Math.PI) * -0.014 + (t < 0.35 ? (0.35 - t) * 0.03 : 0);
     const scale = 1 - t * 0.3;
     const body = sphere(14);
-    body.scale(0.017 * scale, 0.011, 0.015 * scale);
+    body.scale(0.017 * scale, 0.0095, 0.015 * scale);
     body.translate(0, y, z);
     parts.push(body);
+    // Spinous process: the ridge felt down the back.
+    const ridge = sphere(8);
+    ridge.scale(0.004, 0.008, 0.012);
+    ridge.translate(0, y - 0.002, z - 0.02 * scale);
+    parts.push(ridge);
   }
   return merge(parts);
 }
@@ -233,7 +270,19 @@ function brain(): THREE.BufferGeometry {
     if (v.y < -0.4) v.y = -0.4 + (v.y + 0.4) * 0.45;
   });
   geometry.scale(0.068, 0.06, 0.072);
-  return geometry;
+  const cerebellum = deform(sphere(28), (v) => {
+    v.y *= 0.6;
+    v.multiplyScalar(1 + Math.sin(v.x * 26) * 0.03);
+  });
+  cerebellum.scale(0.04, 0.024, 0.03);
+  cerebellum.translate(0, -0.052, -0.04);
+  const stem = taperedTube(
+    [[0, -0.03, -0.005], [0, -0.06, -0.012], [0, -0.09, -0.016]],
+    [0.011, 0.009, 0.007],
+    10,
+    10,
+  );
+  return merge([geometry, cerebellum, stem]);
 }
 
 const BUILDERS: Record<string, (mirror: boolean) => THREE.BufferGeometry> = {

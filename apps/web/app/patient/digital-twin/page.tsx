@@ -23,6 +23,8 @@ interface Scenario {
   ruleSetVersion?: string;
   sourceRecordCount?: number;
   recalculationRequired?: boolean;
+  /** Present only once a doctor has read and approved the wording. */
+  patientSummary?: { text: string; modelId: string };
 }
 
 const HORIZONS = [7, 30, 90, 365];
@@ -85,6 +87,22 @@ export default function PatientDigitalTwinPage() {
               </span>
               <RiskBadge color={scenario.overallRisk} />
             </div>
+
+            {scenario.patientSummary && (
+              <div className="mb-5 rounded border p-4" style={{ borderColor: "var(--line)", background: "var(--sunken)" }}>
+                <span className="readout">{t("ptw.summary")}</span>
+                <p className="mt-2 max-w-readable text-[14px] leading-relaxed text-ink">
+                  {scenario.patientSummary.text}
+                </p>
+                <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.1em] text-ink-faint">
+                  {scenario.patientSummary.modelId === "doctor-written"
+                    ? t("ptw.summaryByDoctor")
+                    : scenario.patientSummary.modelId.startsWith("demo-fallback")
+                      ? t("ptw.summaryDemo")
+                      : t("ptw.summaryProvenance", { model: scenario.patientSummary.modelId })}
+                </p>
+              </div>
+            )}
 
             <DigitalTwinViewer
               beforeSignals={scenario.baselineSignals ?? []}

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { logger } from "../../config/logger";
-import { callGroqStructured } from "../ai-analysis/groq.client";
+import { callGeminiStructured } from "../ai-analysis/gemini.client";
 import { DrugReference, type DrugReferenceDoc } from "./drug-reference.model";
 
 /**
@@ -147,7 +147,7 @@ async function condense(
   name: string,
   sections: Array<{ heading: string; text: string }>,
 ): Promise<string | null> {
-  const result = await callGroqStructured({
+  const result = await callGeminiStructured({
     systemPrompt:
       "You condense official medicine label text for a clinician. You may ONLY use the label text provided. " +
       "Never add a dose, threshold, interaction or contraindication that is not present in the supplied text. " +

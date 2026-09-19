@@ -17,7 +17,7 @@ interface DocumentRow {
   fileName: string;
   mimeType: string;
   sizeBytes: number;
-  extractionMethod?: "pdf_text_layer" | "docx" | "plain_text" | "pasted" | "none";
+  extractionMethod?: "pdf_text_layer" | "docx" | "plain_text" | "pasted" | "vision" | "none";
   extractionNote?: string;
   analyzedAt?: string;
   createdAt: string;
@@ -28,7 +28,7 @@ interface CandidateRecord {
   type: string;
   eventDate: string;
   verificationStatus: string;
-  data: { description?: string; value?: number | string; unit?: string; confidence?: string; field?: string };
+  data: { description?: string; value?: number | string; unit?: string; confidence?: string; field?: string; normalizedName?: string; uncertain?: boolean };
   sourceReferences?: Array<{ span?: string }>;
 }
 
@@ -37,6 +37,7 @@ const EXTRACTION_LABEL: Record<string, MessageKey> = {
   docx: "di.extract.docx",
   plain_text: "di.extract.plain_text",
   pasted: "di.extract.pasted",
+  vision: "di.extract.vision",
   none: "di.extract.none",
 };
 
@@ -97,14 +98,21 @@ export function DocumentIntake({ patientId }: { patientId: string }) {
       setError(null);
       setActiveDocumentId(document._id);
       queryClient.invalidateQueries({ queryKey: ["documents", patientId] });
-      if (document.extractionMethod && document.extractionMethod !== "none") {
-        // Text was read from the file, so the extraction can run straight away.
+      const readableByVision = document.mimeType === "application/pdf" || document.mimeType.startsWith("image/");
+      if ((document.extractionMethod && document.extractionMethod !== "none") || readableByVision) {
+        // Either text was parsed from the file or Gemini can read it as an
+        // image, so the extraction can run straight away.
         analyze.mutate({ documentId: document._id });
       } else {
         toast(document.extractionNote ?? t("di.pasteToAnalyze"), "info");
       }
     },
     onError: (err) => setError(err instanceof ApiError ? err.message : t("di.uploadFailed")),
+  });
+
+  const exportPdf = useMutation({
+    mutationFn: (documentId: string) => api.download(`/documents/${documentId}/export.pdf`, "extraction.pdf"),
+    onError: (err) => setError(err instanceof ApiError ? err.message : t("di.exportFailed")),
   });
 
   const verify = useMutation({
@@ -229,6 +237,13 @@ export function DocumentIntake({ patientId }: { patientId: string }) {
                           </span>
                         )}
                       </p>
+                      {(record.data.normalizedName || record.data.uncertain) && (
+                        <p className="mt-0.5 font-mono text-[11px] text-ink-faint">
+                          {record.data.normalizedName ? t("di.normalizedAs", { name: record.data.normalizedName }) : ""}
+                          {record.data.normalizedName && record.data.uncertain ? " · " : ""}
+                          {record.data.uncertain ? t("di.uncertain") : ""}
+                        </p>
+                      )}
                       <p className="mt-0.5 font-mono text-[11px] text-ink-faint">
                         {humanizeEnum(record.type)} · {formatDate(record.eventDate)}
                         {record.data.confidence
@@ -289,6 +304,16 @@ export function DocumentIntake({ patientId }: { patientId: string }) {
                     {document.extractionMethod ? ` · ${t(EXTRACTION_LABEL[document.extractionMethod])}` : ""}
                   </p>
                 </div>
+                <div className="flex shrink-0 items-center gap-4">
+                {document.analyzedAt && (
+                  <button
+                    onClick={() => exportPdf.mutate(document._id)}
+                    disabled={exportPdf.isPending}
+                    className="font-mono text-[10px] uppercase tracking-[0.1em] text-signal hover:underline disabled:text-ink-faint"
+                  >
+                    {t("di.exportPdf")}
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     setActiveDocumentId(document._id);
@@ -299,6 +324,7 @@ export function DocumentIntake({ patientId }: { patientId: string }) {
                 >
                   {document.analyzedAt ? t("di.reExtract") : t("di.extractFacts")}
                 </button>
+                </div>
               </li>
             ))}
           </ul>

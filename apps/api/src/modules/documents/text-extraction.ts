@@ -27,7 +27,7 @@ export async function extractDocumentText(mimeType: string, buffer: Buffer): Pro
       const text = normalize(result.text ?? "");
       return text
         ? { text, method: "pdf_text_layer" }
-        : { ...EMPTY, reason: "This PDF has no text layer. It looks scanned, so it needs OCR or pasted text." };
+        : { ...EMPTY, reason: "This PDF has no text layer, so it looks scanned. Gemini will read the pages directly when you analyze it." };
     }
 
     if (mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
@@ -43,7 +43,7 @@ export async function extractDocumentText(mimeType: string, buffer: Buffer): Pro
 
     return {
       ...EMPTY,
-      reason: "Images are not read automatically here — paste the text from this document to analyze it.",
+      reason: "This is an image. Gemini will read it directly when you analyze it, or you can paste the text instead.",
     };
   } catch (err) {
     logger.error({ err, mimeType }, "Deterministic text extraction failed");

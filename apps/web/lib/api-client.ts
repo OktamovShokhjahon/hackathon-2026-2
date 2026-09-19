@@ -90,6 +90,22 @@ export const api = {
     request<T>(path, { method: "POST", body: data ? JSON.stringify(data) : undefined }),
   patch: <T>(path: string, data?: unknown) =>
     request<T>(path, { method: "PATCH", body: data ? JSON.stringify(data) : undefined }),
+  /** Fetches a file with the session's token and hands it to the browser as a download. */
+  download: async (path: string, fallbackName: string): Promise<void> => {
+    const res = await send(path, { method: "GET" }, true);
+    if (!res.ok) {
+      const body = await res.json().catch(() => undefined);
+      throw new ApiError(res.status, body?.error ?? "Download failed", body?.details);
+    }
+    const disposition = res.headers.get("Content-Disposition") ?? "";
+    const name = /filename="?([^";]+)"?/.exec(disposition)?.[1] ?? fallbackName;
+    const url = URL.createObjectURL(await res.blob());
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = name;
+    link.click();
+    URL.revokeObjectURL(url);
+  },
   /**
    * Multipart upload. The browser must set its own boundary, so this one never
    * sets Content-Type.

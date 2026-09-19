@@ -8,7 +8,7 @@ import { MedicalRecord } from "../medical-records/medical-record.model";
 import { Allergy } from "../medications/allergy.model";
 import { TreatmentScenario } from "./treatment-scenario.model";
 import { runClinicalRules, type PatientSnapshot } from "./rule-engine";
-import { callGroqStructured, NARRATIVE_SCHEMA } from "./groq.client";
+import { callGeminiStructured, NARRATIVE_SCHEMA } from "./gemini.client";
 import { AIJob } from "./ai-job.model";
 import { RULE_SET_VERSION } from "./rule-catalog";
 
@@ -127,10 +127,10 @@ export async function createTreatmentScenario(input: CreateTreatmentScenarioInpu
     task: "scenario_narrative",
     status: "processing",
     promptVersion: PROMPT_VERSION,
-    modelId: env.groqModel,
+    modelId: env.geminiModel,
   });
 
-  const aiResult = await callGroqStructured({
+  const aiResult = await callGeminiStructured({
     systemPrompt:
       "You are a clinical explanation assistant. You ONLY explain deterministic rule results already computed by the system. " +
       "Never invent thresholds, drug choices, or contraindications. If information is insufficient, say so. " +
@@ -143,6 +143,7 @@ export async function createTreatmentScenario(input: CreateTreatmentScenarioInpu
       horizonDays,
     }),
     schema: NARRATIVE_SCHEMA,
+    tenantId: input.tenantId,
     promptVersion: PROMPT_VERSION,
   });
 
@@ -171,7 +172,9 @@ export async function createTreatmentScenario(input: CreateTreatmentScenarioInpu
     projectionFrom,
     projectionTo,
     confidence,
-    modelId: env.groqModel,
+    // The model that actually answered, so a pre-recorded demo answer is
+    // never recorded as live Gemini output.
+    modelId: aiResult.modelId,
     promptVersion: PROMPT_VERSION,
     ruleSetVersion: RULE_SET_VERSION,
     // The explanation is stored with the analysis it explains: a doctor

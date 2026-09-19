@@ -49,13 +49,14 @@ const SHELL_FRAGMENT = /* glsl */ `
     vec3 halfway = normalize(light + view);
     float sheen = pow(max(dot(normal, halfway), 0.0), 36.0) * 0.16;
 
-    // On a light ground the silhouette has to DARKEN at grazing angles. A
-    // glowing rim is a dark-theme idiom and disappears against white.
-    vec3 color = mix(uSkin * (0.78 + diffuse * 0.32), uEdge, fresnel * 0.85) + sheen;
+    // Dark ground: the silhouette LIGHTENS at grazing angles, like an X-ray
+    // plate. A tight rim (pow 3) keeps the outline crisp instead of a haze.
+    float rim = pow(1.0 - facing, 3.0);
+    vec3 color = mix(uSkin * (0.7 + diffuse * 0.6), uEdge, clamp(fresnel * 0.5 + rim * 0.9, 0.0, 1.0)) + sheen;
 
-    // Skin stays translucent enough to read the organs through it, and firms
-    // up at the edges so the body still has a definite outline.
-    float alpha = uOpacity * (0.46 + fresnel * 0.5);
+    // The body interior is nearly clear so organs read at full strength; only
+    // the rim and a faint skin veil are drawn.
+    float alpha = uOpacity * (0.12 + fresnel * 0.28 + rim * 0.6);
 
     gl_FragColor = vec4(color, clamp(alpha, 0.0, 1.0));
   }
@@ -64,10 +65,10 @@ const SHELL_FRAGMENT = /* glsl */ `
 function useShellMaterials() {
   return useMemo(() => {
     const uniforms = {
-      uSkin: { value: new THREE.Color("#f4f7fb") },
-      uEdge: { value: new THREE.Color("#8fa8bd") },
+      uSkin: { value: new THREE.Color("#2a4256") },
+      uEdge: { value: new THREE.Color("#8fe3f2") },
       uLight: { value: new THREE.Vector3(0.45, 0.68, 0.9).normalize() },
-      uOpacity: { value: 0.96 },
+      uOpacity: { value: 1 },
     };
 
     const shell = new THREE.ShaderMaterial({
@@ -123,7 +124,7 @@ export function BodyShell({ sex, dissectRef }: { sex: Sex; dissectRef?: MutableR
 
   useFrame(() => {
     const dissect = dissectRef?.current ?? 0;
-    const opacity = 0.96 * (1 - dissect);
+    const opacity = 1 - dissect;
     shell.uniforms.uOpacity.value = opacity;
     if (groupRef.current) groupRef.current.visible = opacity > 0.02;
   });
@@ -162,6 +163,36 @@ const VESSEL_PATHS: Array<Array<[number, number, number]>> = [
     [0.03, 1.46, 0.008],
     [0.032, 1.55, 0.014],
   ],
+  // Vena cava, running beside the aorta into the right atrium
+  [
+    [-0.024, 0.95, -0.02],
+    [-0.026, 1.1, -0.012],
+    [-0.02, 1.24, 0.008],
+    [-0.008, 1.29, 0.03],
+  ],
+  // Renal arteries
+  [
+    [0.006, 1.06, -0.03],
+    [0.04, 1.06, -0.04],
+    [0.075, 1.06, -0.05],
+  ],
+  [
+    [0.006, 1.06, -0.03],
+    [-0.04, 1.06, -0.04],
+    [-0.075, 1.06, -0.05],
+  ],
+  // Pulmonary trunk and arteries
+  [
+    [0.03, 1.32, 0.05],
+    [0.02, 1.36, 0.035],
+    [-0.02, 1.37, 0.02],
+    [-0.055, 1.35, 0.005],
+  ],
+  [
+    [0.02, 1.36, 0.035],
+    [0.05, 1.36, 0.02],
+    [0.08, 1.34, 0.005],
+  ],
   // Iliac branches
   [
     [0.0, 0.95, -0.025],
@@ -190,7 +221,7 @@ export function VascularTree({ color, intensity }: { color: THREE.Color; intensi
         const curve = new THREE.CatmullRomCurve3(
           path.map(([x, y, z]) => new THREE.Vector3(x, y, z)),
         );
-        return new THREE.TubeGeometry(curve, 40, 0.0065, 10, false);
+        return new THREE.TubeGeometry(curve, 40, 0.0075, 10, false);
       }),
     [],
   );
@@ -217,19 +248,72 @@ export function VascularTree({ color, intensity }: { color: THREE.Color; intensi
 }
 
 /* --------------------------------------------------------------------------
-   Skeleton hint: a faint ribcage so the chest cavity has depth behind the heart.
+   Skeleton: paired ribs, sternum and clavicles, so the chest cavity has depth
+   behind the heart and the torso reads as a body rather than a shell.
    -------------------------------------------------------------------------- */
 
+function ribGeometries(): THREE.BufferGeometry[] {
+  const list: THREE.BufferGeometry[] = [];
+  // Each rib leaves the spine, bows outward and forward, then sweeps down and
+  // in to meet the sternum. Lower ribs sit lower and wider.
+  for (let index = 0; index < 8; index += 1) {
+    const y = 1.4 - index * 0.036;
+    const half = 0.1 + Math.sin((index / 7) * Math.PI * 0.85) * 0.05;
+    for (const side of [1, -1]) {
+      const path = [
+        [side * 0.018, y + 0.012, -0.066],
+        [side * half * 0.85, y + 0.006, -0.05],
+        [side * half * 1.02, y - 0.008, 0.005],
+        [side * half * 0.7, y - 0.026, 0.05],
+        [side * 0.026, y - 0.046 - index * 0.002, 0.07],
+      ].map(([x, py, z]) => new THREE.Vector3(x, py, z));
+      list.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(path), 36, 0.0032, 6, false));
+    }
+  }
+  // Sternum down the midline.
+  list.push(
+    new THREE.TubeGeometry(
+      new THREE.CatmullRomCurve3([
+        new THREE.Vector3(0, 1.43, 0.07),
+        new THREE.Vector3(0, 1.3, 0.079),
+        new THREE.Vector3(0, 1.16, 0.074),
+      ]),
+      12,
+      0.0085,
+      8,
+      false,
+    ),
+  );
+  // Clavicles.
+  for (const side of [1, -1]) {
+    list.push(
+      new THREE.TubeGeometry(
+        new THREE.CatmullRomCurve3([
+          new THREE.Vector3(side * 0.012, 1.425, 0.066),
+          new THREE.Vector3(side * 0.07, 1.435, 0.06),
+          new THREE.Vector3(side * 0.14, 1.42, 0.02),
+        ]),
+        16,
+        0.0042,
+        6,
+        false,
+      ),
+    );
+  }
+  return list;
+}
+
+/** Bone reads as pale ivory against the dark stage and the coloured organs. */
 export function Ribcage({ dissectRef }: { dissectRef?: MutableRefObject<number> }) {
-  const ribs = useMemo(() => [1.16, 1.22, 1.28, 1.34], []);
-  const materials = useRef<THREE.MeshBasicMaterial[]>([]);
+  const geometries = useMemo(ribGeometries, []);
+  const materials = useRef<THREE.MeshStandardMaterial[]>([]);
   const groupRef = useRef<THREE.Group>(null);
 
-  // The cage opens as the view closes in: ribs thin out and lift apart, so the
+  // The cage opens as the view closes in: bones thin out and lift apart, so the
   // heart behind them is read directly rather than through a grille.
   useFrame(() => {
     const dissect = dissectRef?.current ?? 0;
-    for (const material of materials.current) material.opacity = 0.5 * (1 - dissect * 0.88);
+    for (const material of materials.current) material.opacity = 0.62 * (1 - dissect * 0.85);
     if (groupRef.current) groupRef.current.scale.setScalar(1 + dissect * 0.16);
   });
 
@@ -237,14 +321,15 @@ export function Ribcage({ dissectRef }: { dissectRef?: MutableRefObject<number> 
 
   return (
     <group ref={groupRef} renderOrder={0}>
-      {ribs.map((y, index) => (
-        <mesh key={y} position={[0, y, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[1, 0.66, 1]}>
-          <torusGeometry args={[0.136 - index * 0.004, 0.005, 8, 40, Math.PI * 1.55]} />
-          <meshBasicMaterial
-            ref={(material: THREE.MeshBasicMaterial | null) => {
+      {geometries.map((geometry, index) => (
+        <mesh key={index} geometry={geometry} raycast={IGNORE_RAYCAST}>
+          <meshStandardMaterial
+            ref={(material: THREE.MeshStandardMaterial | null) => {
               if (material) materials.current.push(material);
             }}
-            color="#b9c6d4"
+            color="#e4dccb"
+            roughness={0.55}
+            metalness={0}
             transparent
             depthWrite={false}
           />

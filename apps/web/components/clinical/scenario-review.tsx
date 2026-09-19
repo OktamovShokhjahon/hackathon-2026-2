@@ -17,6 +17,7 @@ export interface ReviewableScenario {
   status: string;
   recalculationRequired?: boolean;
   overallRisk: "green" | "yellow" | "red";
+  patientSummary?: { text: string; modelId: string; approved: boolean };
   doctorReview?: {
     decision: Decision;
     note?: string;
@@ -52,7 +53,7 @@ export function ScenarioReview({
 }) {
   const queryClient = useQueryClient();
   const toast = useToast();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [decision, setDecision] = useState<Decision | null>(null);
   const [note, setNote] = useState("");
   const [visibleToPatient, setVisibleToPatient] = useState(false);
@@ -86,6 +87,33 @@ export function ScenarioReview({
       queryClient.invalidateQueries({ queryKey: ["scenarios", patientId] });
     },
     onError: (err) => setError(err instanceof ApiError ? err.message : t("sr.rerunFailed")),
+  });
+
+  const [draft, setDraft] = useState<string | null>(null);
+  // The API materialises an empty `patientSummary` object; only text counts.
+  const summary = scenario.patientSummary?.text ? scenario.patientSummary : undefined;
+  const summaryText = draft ?? summary?.text ?? "";
+
+  const generateSummary = useMutation({
+    mutationFn: () =>
+      api.post<{ aiAvailable: boolean; aiError?: string }>(`/treatment-scenarios/${scenario._id}/patient-summary`, { language: locale }),
+    onSuccess: (result) => {
+      setDraft(null);
+      setError(result.aiAvailable ? null : t("sr.summaryUnavailable"));
+      queryClient.invalidateQueries({ queryKey: ["scenarios", patientId] });
+    },
+    onError: (err) => setError(err instanceof ApiError ? err.message : t("sr.summaryFailed")),
+  });
+
+  const approveSummary = useMutation({
+    mutationFn: () =>
+      api.post(`/treatment-scenarios/${scenario._id}/patient-summary/approve`, { text: summaryText }),
+    onSuccess: () => {
+      toast(t("sr.summaryApproved"));
+      setDraft(null);
+      queryClient.invalidateQueries({ queryKey: ["scenarios", patientId] });
+    },
+    onError: (err) => setError(err instanceof ApiError ? err.message : t("sr.summaryFailed")),
   });
 
   // Mongoose materialises the nested `doctorReview` object because one of its
@@ -153,7 +181,7 @@ export function ScenarioReview({
               className="font-mono text-[10px] uppercase tracking-[0.1em]"
               style={{ color: reviewed.visibleToPatient ? "var(--signal)" : "var(--ink-faint)" }}
             >
-              {reviewed.visibleToPatient ? t("sr.visible") : t("sr.notShared")}
+              {reviewed.visibleToPatient ? (summary?.approved ? t("sr.visible") : t("sr.waitingSummary")) : t("sr.notShared")}
             </span>
           </div>
           {reviewed.note && <p className="mt-2.5 text-[13px] leading-relaxed text-ink">{reviewed.note}</p>}
@@ -169,6 +197,55 @@ export function ScenarioReview({
           </button>
         </motion.div>
       ) : null}
+
+      {reviewed?.decision === "APPROVED" && reviewed.visibleToPatient && (
+        <div className="mt-4 rounded border bg-surface p-4" style={{ borderColor: "var(--line)" }}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span className="readout">{t("sr.summaryHeading")}</span>
+            <button
+              type="button"
+              onClick={() => generateSummary.mutate()}
+              disabled={generateSummary.isPending}
+              className="rounded border border-[color:var(--line-strong)] px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.1em] text-ink transition hover:bg-ink/[0.04] disabled:opacity-60"
+            >
+              {generateSummary.isPending
+                ? t("sr.summaryDrafting")
+                : summary
+                  ? t("sr.summaryRedraft")
+                  : t("sr.summaryDraft")}
+            </button>
+          </div>
+          <p className="mt-2 max-w-readable text-[12.5px] leading-relaxed text-ink-muted">{t("sr.summaryHint")}</p>
+          {(
+            <>
+              <textarea
+                value={summaryText}
+                onChange={(event) => setDraft(event.target.value)}
+                rows={5}
+                aria-label={t("sr.summaryHeading")}
+                placeholder={t("sr.summaryPlaceholder")}
+                className={`${inputClass} mt-3`}
+              />
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => approveSummary.mutate()}
+                  disabled={approveSummary.isPending || summaryText.trim().length === 0}
+                  className="rounded border border-[color:var(--line-strong)] px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.1em] text-ink transition hover:bg-ink/[0.04] disabled:opacity-60"
+                >
+                  {t("sr.summaryApprove")}
+                </button>
+                <span
+                  className="font-mono text-[10px] uppercase tracking-[0.1em]"
+                  style={{ color: summary?.approved && draft === null ? "var(--signal)" : "var(--ink-faint)" }}
+                >
+                  {summary?.approved && draft === null ? t("sr.summaryLive") : t("sr.summaryNotShared")}
+                </span>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {(!reviewed || decision) && (
         <form

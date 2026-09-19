@@ -1,7 +1,7 @@
 import type { ExtractedFacts } from "./document.service";
 
 /**
- * A parser, not a model. When Groq is unreachable the platform must not go
+ * A parser, not a model. When the model is unreachable the platform must not go
  * quiet and must not invent anything (spec 9.5), so this reads the literal
  * text for a small set of values it can recognise character by character and
  * quotes the line each one came from. Anything it does not recognise is

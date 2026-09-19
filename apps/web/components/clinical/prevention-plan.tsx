@@ -28,6 +28,8 @@ export interface PreventionPlan {
   preventionSetVersion: string;
   generatedAt: string;
   patientCode?: string;
+  /** Model-reworded copy of the same suggestions; absent when the model is unavailable. */
+  plainLanguage?: { intro: string; items: Array<{ code: string; text: string }>; modelId: string };
 }
 
 /** Ordered as a day runs. The sequence is the information. */
@@ -52,7 +54,15 @@ function sortRoutine(steps: RoutineStep[]): RoutineStep[] {
  * bottom because it is the part a patient will re-read, and because it must
  * never be mistaken for something that has already happened.
  */
-function ProgramCard({ suggestion, index }: { suggestion: PreventionSuggestion; index: number }) {
+function ProgramCard({
+  suggestion,
+  index,
+  friendly,
+}: {
+  suggestion: PreventionSuggestion;
+  index: number;
+  friendly?: string;
+}) {
   const { t } = useI18n();
   const routine = sortRoutine(suggestion.routine);
 
@@ -66,6 +76,14 @@ function ProgramCard({ suggestion, index }: { suggestion: PreventionSuggestion; 
           <h3 className="display text-[17px] leading-snug text-ink">{suggestion.title}</h3>
         </div>
 
+        {friendly && (
+          <p className="mt-2.5 pl-[30px] text-[14px] leading-relaxed text-ink">
+            {friendly}
+            <span className="ml-2 font-mono text-[10px] uppercase tracking-[0.1em] text-ink-faint">
+              {t("prevention.aiWording")}
+            </span>
+          </p>
+        )}
         <p className="mt-2.5 pl-[30px] text-[13px] leading-relaxed text-ink-muted">
           {suggestion.because}
         </p>
@@ -151,8 +169,16 @@ function PlanBody({ plan }: { plan: PreventionPlan }) {
 
   return (
     <div className="flex flex-col gap-4">
+      {plan.plainLanguage?.intro && (
+        <p className="max-w-readable text-[14px] leading-relaxed text-ink">{plan.plainLanguage.intro}</p>
+      )}
       {plan.suggestions.map((suggestion, index) => (
-        <ProgramCard key={suggestion.code} suggestion={suggestion} index={index} />
+        <ProgramCard
+          key={suggestion.code}
+          suggestion={suggestion}
+          index={index}
+          friendly={plan.plainLanguage?.items.find((item) => item.code === suggestion.code)?.text}
+        />
       ))}
 
       {plan.missingData.length > 0 && (
@@ -181,10 +207,10 @@ function PlanBody({ plan }: { plan: PreventionPlan }) {
  * what this is and what it is not.
  */
 export function PreventionPlanPanel({ endpoint }: { endpoint: string }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const plan = useQuery({
-    queryKey: ["prevention-plan", endpoint],
-    queryFn: () => api.get<PreventionPlan>(endpoint),
+    queryKey: ["prevention-plan", endpoint, locale],
+    queryFn: () => api.get<PreventionPlan>(`${endpoint}${endpoint.includes("?") ? "&" : "?"}lang=${locale}`),
   });
 
   return (

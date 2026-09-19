@@ -9,12 +9,12 @@ remain with a qualified healthcare professional.**
 - **Frontend**: Next.js (App Router), TypeScript, Tailwind CSS, Framer Motion, React Three Fiber — [apps/web](./apps/web)
 - **Backend**: Node.js, Express, TypeScript, Mongoose — [apps/api](./apps/api)
 - **Database**: MongoDB
-- **AI**: Groq (`gpt-oss-20b`) for structured extraction/explanation, gated behind a deterministic clinical rule engine
+- **AI**: Google Gemini (`gemini-2.5-flash`, free tier) for structured extraction, vision, and explanation, gated behind a deterministic clinical rule engine
 
 ## Local development
 
 ```bash
-cp .env.example .env      # fill in MONGODB_URI / GROQ_API_KEY, or use docker-compose's defaults
+cp .env.example .env      # fill in MONGODB_URI / GEMINI_API_KEY (free key: aistudio.google.com/apikey), or use docker-compose's defaults
 npm install
 docker compose up -d mongodb   # or point MONGODB_URI at your own instance
 npm run dev:api            # http://localhost:4000
@@ -57,7 +57,7 @@ docker compose up --build
    names the rule catalog asks for, so an approved eGFR immediately stops being reported as missing.
 4. The rule catalog runs against the verified snapshot: threshold checks, medication-to-medication
    interactions, duplicate therapy and allergy conflicts, each with the values it read attached.
-5. The model explains that result, and never produces it. If Groq is unreachable, the analysis still stands
+5. The model explains that result, and never produces it. If Gemini is unreachable, the analysis still stands
    and the explanation falls back to a restatement of the rule findings, labelled as such.
 6. The doctor records a decision (approve / reject / discontinue) and separately chooses whether to publish
    the scenario to the patient. Nothing reaches the patient without that second, explicit tick.
@@ -67,8 +67,8 @@ docker compose up --build
 - Every tenant-owned Mongo collection is scoped by `tenantId`, which is always taken from the authenticated JWT —
   never from the request body (see [middleware/tenant.ts](./apps/api/src/middleware/tenant.ts)).
 - Deterministic clinical rules ([modules/ai-analysis/rule-catalog.ts](./apps/api/src/modules/ai-analysis/rule-catalog.ts))
-  run before any AI call. The Groq model only explains rule output — it never invents thresholds or contraindications.
-- AI calls are the backend's responsibility only; the browser never talks to Groq directly.
+  run before any AI call. The Gemini model only explains rule output — it never invents thresholds or contraindications.
+- AI calls are the backend's responsibility only; the browser never talks to Gemini directly.
 - Audit events ([modules/audit](./apps/api/src/modules/audit)) are append-only from the application layer.
 - The 3D digital twin ([components/digital-twin](./apps/web/components/digital-twin)) falls back to an accessible
   2D organ-card view on unsupported WebGL/mobile environments.

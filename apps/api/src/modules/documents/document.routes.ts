@@ -7,6 +7,7 @@ import { HttpError } from "../../middleware/errorHandler";
 import { analyzeDocument, uploadDocument } from "./document.service";
 import { DocumentModel } from "./document.model";
 import { recordAuditEvent } from "../audit/audit.service";
+import { buildExtractionReport } from "./extraction-report";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
 
@@ -84,6 +85,30 @@ documentAnalyzeRouter.post("/:documentId/analyze", async (req, res, next) => {
     });
 
     res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+documentAnalyzeRouter.get("/:documentId/export.pdf", async (req, res, next) => {
+  try {
+    const report = await buildExtractionReport({
+      tenantId: req.auth!.tenantId,
+      documentId: req.params.documentId,
+    });
+
+    await recordAuditEvent({
+      tenantId: req.auth!.tenantId,
+      actorId: req.auth!.userId,
+      actorRole: req.auth!.role,
+      action: "document.export_pdf",
+      targetType: "Document",
+      targetId: req.params.documentId,
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${report.fileName}"`);
+    report.stream.pipe(res);
   } catch (err) {
     next(err);
   }

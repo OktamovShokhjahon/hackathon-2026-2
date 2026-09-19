@@ -2,7 +2,7 @@ import { z } from "zod";
 import { Types } from "mongoose";
 import { env } from "../../config/env";
 import { HttpError } from "../../middleware/errorHandler";
-import { callGroqStructured } from "../ai-analysis/groq.client";
+import { callGeminiStructured } from "../ai-analysis/gemini.client";
 import { Diagnosis } from "./diagnosis.model";
 
 const PROMPT_VERSION = "diagnosis-detail@1";
@@ -34,7 +34,7 @@ export async function generateDiagnosisDetail(params: {
   });
   if (!diagnosis) throw new HttpError(404, "Diagnosis not found");
 
-  const result = await callGroqStructured({
+  const result = await callGeminiStructured({
     systemPrompt:
       "You expand a clinical diagnosis label into structured context for a doctor's own review. " +
       "Describe what the condition is, what is usually monitored, what data should be confirmed " +
@@ -49,6 +49,7 @@ export async function generateDiagnosisDetail(params: {
       doctorNote: diagnosis.doctorNote ?? null,
     }),
     schema: DETAIL_SCHEMA,
+    tenantId: params.tenantId,
     promptVersion: PROMPT_VERSION,
     temperature: 0.2,
   });

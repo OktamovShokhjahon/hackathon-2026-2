@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Html, OrbitControls } from "@react-three/drei";
+import { Environment, Html, Lightformer, OrbitControls, Outlines } from "@react-three/drei";
 import * as THREE from "three";
 import { BodyShell, Ribcage, VascularTree } from "./human-model";
 import { organGeometry } from "./organ-shapes";
@@ -30,7 +30,10 @@ export interface ZoomApi {
 }
 
 /** Organ present in the model but carrying no signal in this scenario. */
-const UNASSESSED_HEX = "#c3b0ad";
+const UNASSESSED_HEX = "#8fa3b3";
+
+/** The stage ground. Near-black with a blue cast, so risk colours keep their hue. */
+const STAGE_COLOR = "#060c11";
 
 const CAMERA_PRESETS: Record<TwinView, [number, number, number]> = {
   front: [0, 0.95, 2.45],
@@ -236,14 +239,20 @@ function Organ({
           rotation={site.rotation ?? [0, 0, 0]}
         >
           <mesh geometry={organGeometry(organ.key, index === 1)} renderOrder={0}>
-            <meshStandardMaterial
-              ref={(material: THREE.MeshStandardMaterial | null) => {
+            <meshPhysicalMaterial
+              ref={(material: THREE.MeshPhysicalMaterial | null) => {
                 if (material) materials.current.push(material);
               }}
               transparent
               roughness={0.28}
               metalness={0.05}
+              clearcoat={0.7}
+              clearcoatRoughness={0.22}
+              envMapIntensity={0.9}
             />
+            {/* A thin pale contour separates neighbouring organs on a dark
+                ground; colour alone leaves them merging into one mass. */}
+            <Outlines thickness={0.0016} color="#dff3f8" transparent opacity={0.4} />
           </mesh>
           {/* Additive halo so the organ reads through the body shell. */}
           <mesh
@@ -275,31 +284,31 @@ function Organ({
           style={{ pointerEvents: "none" }}
         >
           <div
-            className="w-[210px] rounded-lg border bg-surface/95 p-3 text-left shadow-lg backdrop-blur"
+            className="w-[210px] rounded-lg border bg-[#0b141a]/95 p-3 text-left text-[#dce6ec] shadow-lg backdrop-blur"
             style={{
-              borderColor: hoveredState ? STATE_HEX[hoveredState] : "var(--line-strong)",
+              borderColor: hoveredState ? STATE_HEX_3D[hoveredState] : "rgba(220,234,242,0.28)",
               // Organs high in the body would push the card off the top of the
               // stage, so those flip below the organ instead.
               transform:
                 organ.sites[0].position[1] > 1.45 ? "translateY(86px)" : "translateY(-86px)",
             }}
           >
-            <div className="font-mono text-[9px] uppercase tracking-[0.16em] text-ink-faint">
+            <div className="font-mono text-[9px] uppercase tracking-[0.16em] text-[#7a8f9c]">
               {t(systemLabelKey(organ.system))}
             </div>
-            <div className="mt-0.5 font-display text-[15px] leading-tight text-ink">
+            <div className="mt-0.5 font-display text-[15px] leading-tight text-white">
               {t(organLabelKey(organ.key))}
             </div>
 
             <div
               className="mt-2 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.1em]"
-              style={{ color: hoveredState ? STATE_HEX[hoveredState] : "var(--ink-faint)" }}
+              style={{ color: hoveredState ? STATE_HEX_3D[hoveredState] : "#9db0bc" }}
             >
               <span aria-hidden>{hoveredState ? STATE_GLYPH[hoveredState] : "–"}</span>
               {hoveredState ? t(STATE_LABEL_KEY[hoveredState]) : t("twin.notAssessed")}
             </div>
 
-            <p className="mt-2 text-[12px] leading-relaxed text-ink-muted">
+            <p className="mt-2 text-[12px] leading-relaxed text-[#9db0bc]">
               {hoveredSignal
                 ? hoveredSignal.explanation
                 : t("twin.notAssessedBody")}
@@ -646,11 +655,11 @@ function Platform() {
     <group>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.002, 0]}>
         <ringGeometry args={[0.34, 0.36, 64]} />
-        <meshBasicMaterial color="#0e7f8f" transparent opacity={0.45} />
+        <meshBasicMaterial color="#3fc4d8" transparent opacity={0.7} />
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
         <ringGeometry args={[0.52, 0.525, 64]} />
-        <meshBasicMaterial color="#2f5fe0" transparent opacity={0.22} />
+        <meshBasicMaterial color="#5f86ff" transparent opacity={0.35} />
       </mesh>
     </group>
   );
@@ -709,13 +718,22 @@ export function BodyScene({
       gl={{ antialias: true, alpha: true }}
       onPointerMissed={() => onSelectOrgan(null)}
     >
-      <color attach="background" args={["#e6edf5"]} />
-      <fog attach="fog" args={["#e6edf5", 4.2, 8.5]} />
+      <color attach="background" args={[STAGE_COLOR]} />
+      <fog attach="fog" args={[STAGE_COLOR, 4.6, 9]} />
 
-      {/* Studio lighting: a bright key with soft fill, as the atlas plate has. */}
-      <ambientLight intensity={1.15} />
-      <directionalLight position={[2.5, 3.5, 2.5]} intensity={1.5} color="#ffffff" />
-      <directionalLight position={[-2.5, 1.5, -1.5]} intensity={0.5} color="#dbe7f3" />
+      {/* Dark stage, lit like an anatomy plate: a cool key, a warm fill and a
+          teal rim from behind that carves the silhouette out of the dark. */}
+      <ambientLight intensity={0.55} />
+      <directionalLight position={[2.5, 3.5, 2.5]} intensity={1.7} color="#ffffff" />
+      <directionalLight position={[-2.5, 1.2, 1.5]} intensity={0.6} color="#ffd9bd" />
+      <directionalLight position={[0, 2.2, -3]} intensity={1.4} color="#5fd4e6" />
+      {/* Softboxes give the organs' clearcoat something to reflect, with no
+          network fetch for an HDRI. */}
+      <Environment resolution={128} frames={1}>
+        <Lightformer form="rect" intensity={2.2} position={[0, 3, 3]} scale={[6, 2, 1]} />
+        <Lightformer form="rect" intensity={1.2} position={[-4, 1, 1]} scale={[1.5, 5, 1]} color="#ffd9bd" />
+        <Lightformer form="rect" intensity={1.6} position={[4, 1, -1]} scale={[1.5, 5, 1]} color="#7fdcec" />
+      </Environment>
 
       <CameraRig view={view} controlsRef={orbitRef} />
       <CursorZoom controlsRef={orbitRef} grabbedRef={grabbedRef} />

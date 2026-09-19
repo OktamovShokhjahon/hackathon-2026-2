@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { HeroTwin } from "@/components/digital-twin/hero-twin";
-import { Mark } from "@/components/ui/app-shell";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { LanguageSwitcher } from "@/components/ui/language-switcher";
+import { MarketingShell } from "@/components/marketing/marketing-shell";
+import { SampleCases } from "@/components/marketing/sample-cases";
 import { Reveal } from "@/components/ui/reveal";
 import { OrganCoverage } from "@/components/marketing/organ-coverage";
 import { ProvenanceChip, gradeDescriptionKey } from "@/components/ui/provenance-chip";
 import { useI18n } from "@/lib/i18n";
+import { MARKETING_COPY } from "@/lib/marketing-content";
 import type { MessageKey } from "@/lib/locales/uz";
 import type { EvidenceGrade } from "@/components/digital-twin/types";
 
@@ -100,35 +100,11 @@ const STATS: Array<{ label: MessageKey; value: MessageKey }> = [
 ];
 
 export default function LandingPage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const cases = MARKETING_COPY[locale].cases;
 
   return (
-    <div>
-      <header className="sticky top-0 z-30 border-b border-[color:var(--line)] bg-paper/80 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-2">
-            <Mark />
-            <span className="display text-lg text-ink">MAYOQ AI</span>
-          </div>
-          <nav className="flex items-center gap-3 sm:gap-4">
-            <LanguageSwitcher />
-            <ThemeToggle />
-            <Link
-              href="/login"
-              className="font-mono text-[11px] uppercase tracking-[0.12em] text-ink-muted transition hover:text-ink"
-            >
-              {t("home.signIn")}
-            </Link>
-            <Link
-              href="/register"
-              className="rounded border border-signal/40 bg-signal/[0.08] px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-[0.12em] text-signal transition hover:bg-signal/15"
-            >
-              {t("home.startDemo")}
-            </Link>
-          </nav>
-        </div>
-      </header>
-
+    <MarketingShell>
       {/* ---------------------------------------------------------------- Hero */}
       <section className="mx-auto grid max-w-6xl items-center gap-10 px-6 pb-24 pt-12 lg:grid-cols-[1fr_1.05fr]">
         <div className="rise">
@@ -181,6 +157,22 @@ export default function LandingPage() {
             {t("home.heroCaption")}
           </p>
         </div>
+      </section>
+
+      {/* --------------------------------------------------------- Sample cases */}
+      <section className="mx-auto max-w-6xl px-6 pb-20">
+        <Reveal>
+          <span className="readout">{cases.eyebrow}</span>
+          <h2 className="display mt-3 max-w-2xl text-[28px] leading-tight text-ink sm:text-[34px]">
+            {cases.title}
+          </h2>
+          <p className="mt-4 max-w-readable text-[15px] leading-relaxed text-ink-muted">
+            {cases.body}
+          </p>
+        </Reveal>
+        <Reveal delay={100} className="mt-10">
+          <SampleCases />
+        </Reveal>
       </section>
 
       {/* -------------------------------------------------------------- Organs */}
@@ -361,6 +353,6 @@ export default function LandingPage() {
           {t("home.disclaimer")}
         </p>
       </section>
-    </div>
+    </MarketingShell>
   );
 }

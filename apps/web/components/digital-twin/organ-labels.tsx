@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
-import { ORGAN_BY_KEY, STATE_GLYPH, STATE_HEX, STATE_LABEL_KEY, organLabelKey } from "./anatomy";
+import { ORGAN_BY_KEY, STATE_GLYPH, STATE_HEX_3D, STATE_LABEL_KEY, organLabelKey } from "./anatomy";
 import { useI18n } from "@/lib/i18n";
 import type { OrganSignal } from "./types";
 
@@ -152,7 +152,7 @@ export function OrganLabels({
                   lineNodes.current[signal.organ] = node;
                 }}
                 fill="none"
-                stroke={STATE_HEX[signal.color]}
+                stroke={STATE_HEX_3D[signal.color]}
                 strokeWidth={active ? 1.6 : 1}
                 strokeOpacity={active ? 1 : 0.7}
               />
@@ -162,7 +162,7 @@ export function OrganLabels({
                 }}
                 r={active ? 4 : 2.6}
                 fill="none"
-                stroke={STATE_HEX[signal.color]}
+                stroke={STATE_HEX_3D[signal.color]}
                 strokeWidth={1.2}
                 strokeOpacity={active ? 1 : 0.7}
               />
@@ -190,19 +190,19 @@ export function OrganLabels({
                 aria-pressed={active}
                 className={`pointer-events-auto absolute flex items-center gap-1.5 whitespace-nowrap rounded border px-2 py-1 backdrop-blur transition ${
                   side === "left" ? "left-0" : "right-0"
-                } ${active ? "bg-surface shadow-sm" : "bg-surface/90 hover:bg-surface hover:shadow-sm"}`}
+                } ${active ? "bg-[#0f1c24] shadow-sm" : "bg-[#0b141a]/85 hover:bg-[#0f1c24]"}`}
                 style={{
-                  borderColor: active ? STATE_HEX[signal.color] : "var(--line-strong)",
+                  borderColor: active ? STATE_HEX_3D[signal.color] : "rgba(220,234,242,0.24)",
                 }}
               >
                 <span
                   aria-hidden
                   className="font-mono text-[9px] font-bold leading-none"
-                  style={{ color: STATE_HEX[signal.color] }}
+                  style={{ color: STATE_HEX_3D[signal.color] }}
                 >
                   {STATE_GLYPH[signal.color]}
                 </span>
-                <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-ink">
+                <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-[#dce6ec]">
                   {organ ? t(organLabelKey(organ.key)) : signal.organ}
                 </span>
                 <span className="sr-only">: {t(STATE_LABEL_KEY[signal.color])}</span>

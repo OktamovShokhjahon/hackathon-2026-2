@@ -8,6 +8,7 @@ import { TreatmentScenario } from "./treatment-scenario.model";
 import { recordAuditEvent } from "../audit/audit.service";
 import { HttpError } from "../../middleware/errorHandler";
 import { assertEntitlement } from "../subscriptions/entitlements.service";
+import { generatePatientSummary, approvePatientSummary } from "./patient-summary.service";
 
 export const treatmentScenarioRouter = Router({ mergeParams: true });
 
@@ -119,6 +120,51 @@ scenarioReviewRouter.post("/:scenarioId/recalculate", async (req, res, next) => 
     });
 
     res.status(201).json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+scenarioReviewRouter.post("/:scenarioId/patient-summary", async (req, res, next) => {
+  try {
+    const result = await generatePatientSummary({
+      tenantId: req.auth!.tenantId,
+      scenarioId: req.params.scenarioId,
+      language: z.enum(["en", "ru", "uz"]).optional().parse(req.body?.language),
+    });
+    await recordAuditEvent({
+      tenantId: req.auth!.tenantId,
+      actorId: req.auth!.userId,
+      actorRole: req.auth!.role,
+      action: "treatment_scenario.patient_summary.generate",
+      targetType: "TreatmentScenario",
+      targetId: req.params.scenarioId,
+      afterSummary: { aiAvailable: result.aiAvailable },
+    });
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+scenarioReviewRouter.post("/:scenarioId/patient-summary/approve", async (req, res, next) => {
+  try {
+    const input = z.object({ text: z.string().min(1).max(2000).optional() }).parse(req.body);
+    const scenario = await approvePatientSummary({
+      tenantId: req.auth!.tenantId,
+      scenarioId: req.params.scenarioId,
+      approvedBy: req.auth!.userId,
+      text: input.text,
+    });
+    await recordAuditEvent({
+      tenantId: req.auth!.tenantId,
+      actorId: req.auth!.userId,
+      actorRole: req.auth!.role,
+      action: "treatment_scenario.patient_summary.approve",
+      targetType: "TreatmentScenario",
+      targetId: req.params.scenarioId,
+    });
+    res.json(scenario);
   } catch (err) {
     next(err);
   }

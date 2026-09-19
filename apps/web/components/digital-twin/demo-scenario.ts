@@ -101,7 +101,7 @@ export const DEMO_AFTER: OrganSignal[] = [
 
 export const DEMO_META = {
   analyzedAt: "2026-09-18T09:14:00.000Z",
-  modelId: "openai/gpt-oss-20b",
+  modelId: "gemini-2.5-flash",
   ruleSetVersion: "rules-2026.03",
   sourceRecordCount: 14,
   stale: false,

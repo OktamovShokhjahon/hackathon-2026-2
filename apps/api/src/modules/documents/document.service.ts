@@ -5,7 +5,7 @@ import { z } from "zod";
 import { HttpError } from "../../middleware/errorHandler";
 import { DocumentModel } from "./document.model";
 import { AIJob } from "../ai-analysis/ai-job.model";
-import { callGroqStructured } from "../ai-analysis/groq.client";
+import { callGeminiStructured, type InlineMedia } from "../ai-analysis/gemini.client";
 import { MedicalRecord } from "../medical-records/medical-record.model";
 import { extractDocumentText } from "./text-extraction";
 import { extractFactsDeterministically } from "./deterministic-extraction";
@@ -35,10 +35,19 @@ export const EXTRACTED_FACTS_SCHEMA = z.object({
       value: z.union([z.string(), z.number()]).optional(),
       unit: z.string().optional(),
       date: z.string().optional(),
+      // The standard form of the name (generic drug, canonical lab test), when the
+      // text uses a brand, abbreviation or local spelling. Absent, never guessed.
+      normalizedName: z.string().optional(),
+      // True when the text gives only a partial date or an ambiguous value.
+      uncertain: z.boolean().optional(),
       sourceSpan: z.string(),
       confidence: z.enum(["low", "medium", "high"]),
     })
   ),
+  // Dated events in the order the document describes them, oldest first.
+  timeline: z
+    .array(z.object({ date: z.string().optional(), event: z.string(), uncertain: z.boolean().optional() }))
+    .optional(),
   missingOrUnclear: z.array(z.string()),
 });
 
@@ -86,7 +95,7 @@ export async function uploadDocument(params: {
   return document;
 }
 
-const PROMPT_VERSION = "document-understanding@1";
+const PROMPT_VERSION = "document-understanding@2";
 
 export async function analyzeDocument(params: {
   tenantId: string;
@@ -104,11 +113,25 @@ export async function analyzeDocument(params: {
     document.extractionNote = undefined;
   }
 
+  // No parsed or pasted text: a scan or a photo can still be read by the model
+  // directly. Anything else genuinely has nothing to read.
+  let media: InlineMedia[] | undefined;
   if (!document.extractedText) {
-    throw new HttpError(
-      422,
-      document.extractionNote ?? "There is no readable text in this document. Paste its text to analyze it."
-    );
+    const readableByVision = document.mimeType === "application/pdf" || document.mimeType.startsWith("image/");
+    if (!readableByVision) {
+      throw new HttpError(
+        422,
+        document.extractionNote ?? "There is no readable text in this document. Paste its text to analyze it."
+      );
+    }
+    const stored = await fs
+      .readFile(path.join(STORAGE_ROOT, document.storageKey.replace(/\//g, "_")))
+      .catch(() => null);
+    if (!stored) {
+      throw new HttpError(422, "The stored file could not be opened. Upload it again or paste its text.");
+    }
+    media = [{ mimeType: document.mimeType, data: stored }];
+    document.extractionMethod = "vision";
   }
   await document.save();
 
@@ -119,15 +142,19 @@ export async function analyzeDocument(params: {
     task: "document_understanding",
     status: "processing",
     promptVersion: PROMPT_VERSION,
-    modelId: env.groqModel,
+    modelId: env.geminiModel,
   });
 
-  const result = await callGroqStructured({
+  const result = await callGeminiStructured({
     systemPrompt:
       "You extract candidate clinical facts from a medical document. Return ONLY facts explicitly present in the text. " +
       'Use "unknown" rather than guessing. Every fact needs a sourceSpan quoting the originating text. ' +
+      "When the text uses a brand name, abbreviation or local spelling, put the standard generic or canonical name in normalizedName; omit it if unsure. " +
+      "Set uncertain to true for partial dates or ambiguous values, and list dated events oldest-first in timeline. " +
       "Return strict JSON matching the schema you were given.",
-    userPrompt: document.extractedText,
+    userPrompt: document.extractedText ?? "Read the attached document and extract the candidate clinical facts it contains.",
+    media,
+    tenantId: params.tenantId,
     schema: EXTRACTED_FACTS_SCHEMA,
     promptVersion: PROMPT_VERSION,
   });
@@ -147,7 +174,7 @@ export async function analyzeDocument(params: {
   // With the model down, a literal parser reads what it can recognise from the
   // same text. It is labelled as such everywhere it surfaces: a doctor must
   // never have to wonder which of the two produced a candidate.
-  const extraction = result.ok && result.data ? result.data : extractFactsDeterministically(document.extractedText);
+  const extraction = result.ok && result.data ? result.data : extractFactsDeterministically(document.extractedText ?? "");
   const extractionSource: "model" | "deterministic_parser" = result.ok ? "model" : "deterministic_parser";
 
   // Candidates are written down as AI_UNVERIFIED records so they land in the
@@ -215,12 +242,16 @@ async function persistCandidateFacts(params: {
     eventDate: parseFactDate(fact.date),
     data: {
       description: fact.description,
+      // The record's name: the standard form when the model found one.
+      name: fact.normalizedName ?? fact.description,
       // `field` is what the rule engine reads; it is only set when the value is
       // numeric and the name maps onto a field a rule actually asks for.
       field: fact.type === "lab_result" ? canonicalLabField(fact.description) : undefined,
       value: typeof fact.value === "string" ? Number(fact.value) || fact.value : fact.value,
       unit: fact.unit,
       confidence: fact.confidence,
+      normalizedName: fact.normalizedName,
+      uncertain: fact.uncertain,
       documentType: params.facts.documentType,
     },
     sourceType: "external_document" as const,

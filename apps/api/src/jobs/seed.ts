@@ -8,6 +8,7 @@ import { Diagnosis } from "../modules/diagnoses/diagnosis.model";
 import { Medication } from "../modules/medications/medication.model";
 import { MedicalRecord } from "../modules/medical-records/medical-record.model";
 import { createTreatmentScenario, reviewScenario } from "../modules/ai-analysis/treatment-analysis.service";
+import { approvePatientSummary } from "../modules/ai-analysis/patient-summary.service";
 import { TreatmentScenario } from "../modules/ai-analysis/treatment-scenario.model";
 import { Allergy } from "../modules/medications/allergy.model";
 import { Tenant } from "../modules/tenants/tenant.model";
@@ -250,6 +251,12 @@ async function seed() {
     note: "Potassium at the upper end; continue lisinopril and recheck in two weeks.",
     visibleToPatient: true,
   });
+  await approvePatientSummary({
+    tenantId: String(tenant._id),
+    scenarioId: String(p2Scenario.scenario._id),
+    approvedBy: String(doctor._id),
+    text: "Your doctor has reviewed your blood pressure plan. Keep taking lisinopril as instructed and book the blood test in two weeks. The picture of the next 30 days is an illustration, not a promise. Ask your care team if you have questions.",
+  });
 
   // Patient 3: Combined diabetes + hypertension, mixed green/yellow scenario
   const p3 = await createSyntheticPatient("Synthetic Patient Gamma", "patient3@twinrx.example", "PT-DEMO-C3");
@@ -346,6 +353,48 @@ async function seed() {
     createdBy: String(doctor._id),
   });
   await backdateScenario(p3RedScenario.scenario._id, 1);
+
+  // Measurement history, so the patient's trend chart has a line to draw and
+  // the doctor can see direction, not just the latest value. Every point is
+  // dated before the patient's current reading: the rules take the newest
+  // verified value per field, so this changes what the chart shows and
+  // nothing about the analyses created above.
+  async function addLabHistory(
+    patientId: Types.ObjectId,
+    field: string,
+    unit: string,
+    points: Array<{ daysBack: number; value: number }>
+  ) {
+    await MedicalRecord.insertMany(
+      points.map((point) => ({
+        tenantId: tenant._id,
+        patientId,
+        type: "lab_result",
+        eventDate: daysAgo(point.daysBack),
+        data: { field, value: point.value, unit },
+        sourceType: "laboratory",
+        verificationStatus: "verified",
+        verifiedBy: doctor._id,
+        verifiedAt: daysAgo(point.daysBack),
+        createdBy: doctor._id,
+      }))
+    );
+  }
+  // Alpha's current HbA1c (7.8) is dated 2025-11-01, so the history stops
+  // before it; the earlier readings are relative and land well ahead of that.
+  await addLabHistory(p1.profile._id, "latestHba1c", "%", [
+    { daysBack: 700, value: 8.9 },
+    { daysBack: 620, value: 8.6 },
+    { daysBack: 540, value: 8.3 },
+    { daysBack: 470, value: 8.1 },
+  ]);
+  await addLabHistory(p2.profile._id, "latestSystolicBp", "mmHg", [
+    { daysBack: 300, value: 161 },
+    { daysBack: 240, value: 158 },
+    { daysBack: 180, value: 156 },
+    { daysBack: 120, value: 155 },
+    { daysBack: 60, value: 153 },
+  ]);
 
   logger.info(
     {

@@ -11,7 +11,7 @@ export interface DocumentDoc {
   virusScanStatus: "pending" | "clean" | "infected";
   extractedText?: string;
   /** How the text was obtained: a parser, or a person pasting it. */
-  extractionMethod?: "pdf_text_layer" | "docx" | "plain_text" | "pasted" | "none";
+  extractionMethod?: "pdf_text_layer" | "docx" | "plain_text" | "pasted" | "vision" | "none";
   extractionNote?: string;
   /** Set once a doctor has been offered the extracted candidates. */
   analyzedAt?: Date;
@@ -33,7 +33,7 @@ const documentSchema = new Schema<DocumentDoc>(
     extractedText: { type: String },
     extractionMethod: {
       type: String,
-      enum: ["pdf_text_layer", "docx", "plain_text", "pasted", "none"],
+      enum: ["pdf_text_layer", "docx", "plain_text", "pasted", "vision", "none"],
     },
     extractionNote: { type: String },
     analyzedAt: { type: Date },
